@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT l.grant_generation, l.sync_generation FROM email_links l\n            WHERE l.id = $1 AND l.provider = 'IMAP' AND l.is_sync_active\n                AND (l.macro_id = $2 OR EXISTS (SELECT 1 FROM macro_user_links u\n                    WHERE u.link_id = l.id AND u.primary_macro_id = $2))",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "grant_generation",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "sync_generation",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "0eccad295accbf510172e937622659d518b40f34cc63c9edfa05fe132b902812"
+}

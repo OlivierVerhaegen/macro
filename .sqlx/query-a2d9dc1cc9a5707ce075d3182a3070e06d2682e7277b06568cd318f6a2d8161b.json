@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT smtp_host, smtp_port, smtp_security, username FROM imap_accounts WHERE link_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "smtp_host",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "smtp_port",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "smtp_security",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "username",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "a2d9dc1cc9a5707ce075d3182a3070e06d2682e7277b06568cd318f6a2d8161b"
+}

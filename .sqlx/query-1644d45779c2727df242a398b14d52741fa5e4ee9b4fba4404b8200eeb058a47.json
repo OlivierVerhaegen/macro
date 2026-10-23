@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT grant_generation, sync_generation FROM email_links WHERE id = $1 AND provider = 'IMAP' AND is_sync_active",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "grant_generation",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "sync_generation",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "1644d45779c2727df242a398b14d52741fa5e4ee9b4fba4404b8200eeb058a47"
+}
