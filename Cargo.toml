@@ -105,6 +105,7 @@ members = [
   "crates/pipedream_mcp",
   "crates/granola_sync",
   "crates/onboarding",
+  "crates/zoho_client",
   "crates/ai_engine",
   "crates/docx_engine",
   "crates/fig_engine",
