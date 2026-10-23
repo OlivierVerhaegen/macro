@@ -272,8 +272,10 @@ draaien voor elke commit.
 
 ## 6. Open vragen voor jou
 
-1. **CAPABILITY-uitvoer** (sectie 2). Bepaalt CONDSTORE/QRESYNC, OBJECTID en
-   de SMTP-auth.
+1. **Aangenomen, nog te verifiëren.** CAPABILITY-uitvoer: we gaan uit van
+   CONDSTORE, QRESYNC, IDLE, MOVE, UIDPLUS, SPECIAL-USE en XOAUTH2 voor IMAP
+   en SMTP. Bericht-ID's gebruiken `map/UIDVALIDITY/UID`, zodat OBJECTID niet
+   nodig is.
 2. **Akkoord.** Merge-vriendelijkheid: een nieuwe provider raakt onvermijdelijk
    upstream-bestanden (enum, ~40 SQL-filters, workercompositie). Akkoord dat
    die aanpassingen klein en expliciet in upstream-bestanden komen, en al het
