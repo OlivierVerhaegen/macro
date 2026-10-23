@@ -284,6 +284,7 @@ jsonwebtoken = { git = "https://github.com/whutchinson98/jsonwebtoken", features
 lambda_runtime = "0.13.0"
 lazy-regex = "3.6.1"
 lazy_static = "1.5.0"
+lettre = { version = "0.11", default-features = false, features = ["smtp-transport", "tokio1-rustls-tls"] }
 livekit-api = { version = "0.4.16", default-features = false, features = [
   "access-token",
   "rustls-tls-webpki-roots",

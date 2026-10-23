@@ -206,11 +206,19 @@ impl<R: MailboxSettingsRepository, G: MailboxSettingsGateway> MailboxSettingsSer
             return Err(MailboxError::InvalidInput("invalid label name"));
         }
         let mailbox = self.repository.accessible(actor, link).await?;
-        if mailbox.provider == UserProvider::Outlook {
-            return self
-                .repository
-                .queue_label_creation(actor, mailbox, name)
-                .await;
+        match mailbox.provider {
+            UserProvider::Outlook => {
+                return self
+                    .repository
+                    .queue_label_creation(actor, mailbox, name)
+                    .await;
+            }
+            UserProvider::Imap => {
+                return Err(MailboxError::InvalidInput(
+                    "labels are not available for IMAP mailboxes yet",
+                ));
+            }
+            UserProvider::Gmail => {}
         }
         // The provider's unique category name is the natural idempotency key.
         // A lost response or failed local commit is recovered by the next read.

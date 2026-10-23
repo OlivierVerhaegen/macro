@@ -132,22 +132,21 @@ ik uit de `LIST`-uitvoer.
   waarde zoals `local:v1`, zodat sleutelrotatie later mogelijk is. Welke bron
   gebruikt wordt, volgt uit de configuratie. Ontbreekt de sleutel terwijl de
   lokale bron gekozen is, dan stopt de service bij het opstarten.
-- Scopes in fase 1: `ZOHOMAIL.PROTOCOL.IMAP`, `ZOHOMAIL.PROTOCOL.SMTP` (als de
-  test slaagt), `ZohoMail.accounts.READ`, `ZohoMail.messages.READ` en
-  `ZohoMail.folders.READ`. Scopes zijn per grant opgeslagen en uitbreidbaar;
+- Scopes in fase 1: `ZOHOMAIL.PROTOCOL.IMAP`, `ZohoMail.accounts.READ`,
+  `ZohoMail.messages.ALL` en `ZohoMail.folders.ALL`. Scopes zijn per grant opgeslagen en uitbreidbaar;
   fase 6 voegt `ZohoCalendar.*` toe via een herkoppeling.
 - Het token voor IMAP/SMTP gaat via een nieuwe `ImapCredentialGateway` die
   `MailboxCredentialGateway` volgt en de auth-service aanroept
   (`get_zoho_access_token`, naast `get_microsoft_access_token`).
-- **Wachtwoord als terugval** voor generieke IMAP (en voor Zoho-SMTP als
-  XOAUTH2 daar niet werkt): via dezelfde envelope-cipher opgeslagen, nooit
-  gelogd, nooit naar de frontend teruggestuurd. Het schema
-  (`imap_accounts`) voorziet het al; de implementatie volgt na Zoho-OAuth,
-  omdat XOAUTH2 als werkend wordt aangenomen.
-- Terugval voor verzenden als SMTP-XOAUTH2 niet werkt: eerst de Zoho Mail
-  API (`POST /accounts/{id}/messages`). Een app-wachtwoord gebruiken we alleen
-  als de API om een andere reden niet kan. Ik kies op basis van jouw
-  testresultaat.
+- **Verzenden: besloten (optie 1).** Zoho-SMTP biedt geen XOAUTH2, dus IMAP
+  leest met OAuth en SMTP logt in met een Zoho-app-wachtwoord. De gebruiker
+  zet het via `PUT /email/links/{link_id}/smtp_password`; email_service test
+  het eerst met een SMTP-login, daarna bewaart de auth-service het als
+  envelope (doel `smtp-password`, tabel `smtp_passwords`). Het wachtwoord
+  wordt nooit gelogd en nooit naar de frontend teruggestuurd. Zonder
+  wachtwoord weigert verzenden met een duidelijke melding.
+- Wachtwoord-login voor generieke IMAP (niet-Zoho) volgt later; het schema
+  (`imap_accounts.auth_method`) voorziet het al.
 
 ### 3.3 Sync (`MailboxGateway` voor IMAP)
 
@@ -186,8 +185,8 @@ ik uit de `LIST`-uitvoer.
 | Gelezen/ongelezen | `UID STORE +/-FLAGS (\Seen)` |
 | Ster | `\Flagged` |
 | Verplaatsen, archiveren, prullenbak | `UID MOVE` (of COPY+EXPUNGE) naar de map met de juiste rol |
-| Concept opslaan | `APPEND` naar Drafts met `\Draft`; bewerken = nieuwe APPEND plus het oude verwijderen (concepten zijn in IMAP onveranderlijk) |
-| Verzenden | SMTP (`smtp.zoho.eu:465`), daarna `APPEND` naar Sent als Zoho dat niet zelf doet (te testen), en het concept verwijderen |
+| Concept opslaan | Besloten: concepten blijven in Macro en gaan niet naar de map Concept van Zoho |
+| Verzenden | SMTP (`smtp.zoho.eu:465`, app-wachtwoord); daarna wordt de kopie in Verzonden op Message-ID gezocht, en anders zelf met `APPEND` gearchiveerd |
 | Labels/tags | Via de Zoho API als labels geen IMAP-keywords zijn; anders keywords |
 
 Verzenden volgt de bestaande `SubmissionOutcome`-regels: een time-out na het

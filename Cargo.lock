@@ -7143,6 +7143,7 @@ dependencies = [
  "utoipa",
  "uuid",
  "workspace-hack",
+ "zeroize",
 ]
 
 [[package]]
@@ -7332,6 +7333,7 @@ dependencies = [
  "infer 0.19.0",
  "item_filters",
  "last_online_tracker",
+ "lettre",
  "lol_html",
  "macro_auth",
  "macro_authorization",
@@ -22171,6 +22173,7 @@ dependencies = [
  "itertools 0.12.1",
  "itertools 0.13.0",
  "lazy_static",
+ "lettre",
  "libc",
  "libz-sys",
  "linux-raw-sys 0.12.1",

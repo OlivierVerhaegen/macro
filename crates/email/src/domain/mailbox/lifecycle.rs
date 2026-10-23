@@ -248,7 +248,7 @@ fn removal(snapshot: &InboxLifecycleSnapshot, actor: &InboxActor) -> InboxRemova
     {
         return InboxRemoval::Disconnect;
     }
-    let replace_custodian = snapshot.provider == UserProvider::Outlook
+    let replace_custodian = snapshot.provider.uses_mailbox_runtime()
         && snapshot.credential_owner == actor.credential_owner;
     let replacement = replace_custodian
         .then(|| {

@@ -464,8 +464,8 @@ where
             .await?;
         let accessible_link_ids: Vec<Uuid> = accessible_inboxes.iter().map(|l| l.id).collect();
 
-        // The provider binding comes from a stored draft, never from a client.
-        if link.provider == crate::domain::models::UserProvider::Outlook {
+        // The provider binding comes from a stored draft or sync, never from a client.
+        if link.provider.uses_mailbox_runtime() {
             input.provider_id = None;
             input.provider_thread_id = None;
         }

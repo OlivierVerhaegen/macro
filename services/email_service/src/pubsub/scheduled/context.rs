@@ -7,6 +7,7 @@ pub struct ScheduledContext {
     pub db: PgPool,
     pub sqs_worker: sqs_worker::SQSWorker,
     pub email_api: GmailApi,
+    pub imap: crate::outbound::imap_mailbox::ImapSending<crate::composition::ZohoTokens>,
     pub attachment_bytes:
         std::sync::Arc<dyn email::domain::attachment_access::AuthorizedAttachmentBytes>,
     pub s3_client: s3_client::S3,
@@ -28,6 +29,7 @@ impl ScheduledContext {
                     ),
                 ),
             email_api: self.email_api.clone(),
+            imap: self.imap.clone(),
             attachment_bytes: self.attachment_bytes.clone(),
             s3_client: self.s3_client.clone(),
             attachment_bucket: self.attachment_bucket.clone(),

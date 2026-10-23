@@ -71,7 +71,10 @@ the gateway `/email` prefix.
   behind `IMAP_MAILBOXES_ENABLED`; server settings live in `imap_accounts`,
   written when `/email/init` adopts a Zoho grant (`ZohoGrantSource`). Attachment
   downloads for Outlook and IMAP go through `mailbox_attachments.rs`, which
-  routes by the link's provider. Sending from IMAP mailboxes is not built yet.
+  routes by the link's provider. IMAP sends go over SMTP with the mailbox's
+  app password (`imap_mailbox/send.rs`; Zoho SMTP takes no OAuth), set through
+  `PUT /email/links/{link_id}/smtp_password` and kept by the authentication
+  service. The Sent copy found by Message-ID gives the message its ids.
 - Header addresses that Gmail accepts can fail `MacroUserIdStr::try_from_email`.
   Skip the bad address with a WARN that omits it (the parse error echoes it)
   instead of failing the step; see `pubsub::util::build_contact_connections`.

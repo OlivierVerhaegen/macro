@@ -5,18 +5,24 @@
 use email::domain::mailbox::{MailboxError, MailboxGateway, MailboxKey};
 use email_api_client::domain::{
     models::{
-        EmailApiError, MailFolder, MailboxAccess, MailboxChangePage, MailboxMessage, ProviderId,
-        StreamPosition, StreamToken, TokenError, TokenFreshness,
+        EmailApiError, FolderRole, MailFolder, MailboxAccess, MailboxChangePage, MailboxMessage,
+        MailboxOrganization, MessageAction, MessageWriteReceipt, ProviderId, StreamPosition,
+        StreamToken, TokenError, TokenFreshness,
     },
     ports::MailboxTokenSource,
 };
-use imap_client::{ImapConnection, ImapCredentials, ImapError, ImapMessageId, ImapServer};
+use imap_client::{
+    ImapConnection, ImapCredentials, ImapError, ImapMessageId, ImapServer, SystemFlag,
+};
 use sqlx::PgPool;
 use uuid::Uuid;
 use zeroize::Zeroizing;
 
 mod credentials;
+mod send;
+pub mod smtp;
 pub use credentials::ZohoCredentialsClient;
+pub use send::{ImapSendError, ImapSending, PreparedImapSend};
 
 #[cfg(test)]
 mod test;
@@ -26,7 +32,7 @@ const PAGE_SIZE: usize = 200;
 
 #[derive(Clone)]
 pub struct ImapMailboxGateway<T> {
-    db: PgPool,
+    pub(crate) db: PgPool,
     tokens: T,
 }
 
@@ -95,7 +101,10 @@ impl<T: MailboxTokenSource> ImapMailboxGateway<T> {
 
     /// Connect with a cached token, and once more with a fresh one when the
     /// server rejects it: a cached token can outlive a revoked grant.
-    async fn connect(&self, mailbox: MailboxKey) -> Result<ImapConnection, EmailApiError> {
+    pub(crate) async fn connect(
+        &self,
+        mailbox: MailboxKey,
+    ) -> Result<ImapConnection, EmailApiError> {
         let settings = self.settings(mailbox.link_id).await?;
         let server = ImapServer::new(settings.host, settings.port);
         for freshness in [TokenFreshness::Cached, TokenFreshness::Fresh] {
@@ -238,4 +247,107 @@ impl<T: MailboxTokenSource> email::domain::mailbox::projection::MailboxAttachmen
         connection.logout().await;
         bytes?.ok_or(MailboxError::Provider(EmailApiError::NotFound))
     }
+}
+
+/// Folder created for Archive when the server has none (Zoho has no archive).
+/// The catalogue gives it the archive role by name.
+const ARCHIVE_FOLDER: &str = "Archive";
+
+impl<T: MailboxTokenSource> email::domain::mailbox::commands::MailboxCommandGateway
+    for ImapMailboxGateway<T>
+{
+    #[tracing::instrument(name = "imap.mailbox.organization", skip_all, fields(link_id = %mailbox.link_id), err)]
+    async fn organization(
+        &self,
+        mailbox: MailboxKey,
+        message: &ProviderId,
+        folders: &[MailFolder],
+    ) -> Result<Option<MailboxOrganization>, EmailApiError> {
+        let id = ImapMessageId::from_provider_id(message)?;
+        let mut connection = self.connect(mailbox).await?;
+        let organization = connection
+            .organization(&id, folders)
+            .await
+            .map_err(EmailApiError::from);
+        connection.logout().await;
+        organization
+    }
+
+    #[tracing::instrument(name = "imap.mailbox.apply", skip_all, fields(link_id = %mailbox.link_id), err)]
+    async fn apply(
+        &self,
+        mailbox: MailboxKey,
+        message: &ProviderId,
+        action: &MessageAction,
+        expected_version: Option<&str>,
+    ) -> Result<MessageWriteReceipt, EmailApiError> {
+        let id = ImapMessageId::from_provider_id(message)?;
+        let mut connection = self.connect(mailbox).await?;
+        let result = apply(&mut connection, &id, action, expected_version).await;
+        connection.logout().await;
+        result
+    }
+}
+
+async fn apply(
+    connection: &mut ImapConnection,
+    id: &ImapMessageId,
+    action: &MessageAction,
+    expected_version: Option<&str>,
+) -> Result<MessageWriteReceipt, EmailApiError> {
+    let folders = connection.folders().await?;
+    let current = connection
+        .organization(id, &folders)
+        .await?
+        .ok_or(EmailApiError::NotFound)?;
+    // The command coordinator read this version; a newer one means another
+    // client changed the message and the command must reconcile first.
+    if expected_version.is_some_and(|expected| current.version.as_deref() != Some(expected)) {
+        return Err(EmailApiError::Conflict);
+    }
+    let present = |found: bool| {
+        if found {
+            Ok(())
+        } else {
+            Err(EmailApiError::NotFound)
+        }
+    };
+    let destination = match action {
+        MessageAction::SetRead(value) => {
+            present(connection.set_flag(id, SystemFlag::Seen, *value).await?)?;
+            None
+        }
+        MessageAction::SetFlagged(value) => {
+            present(connection.set_flag(id, SystemFlag::Flagged, *value).await?)?;
+            None
+        }
+        MessageAction::SetTags(tags) => {
+            present(connection.set_keywords(id, &current.tags, tags).await?)?;
+            None
+        }
+        MessageAction::MoveToFolder(folder) => Some(folder.as_str().to_owned()),
+        MessageAction::Archive => Some(
+            match folders
+                .iter()
+                .find(|folder| folder.role == FolderRole::Archive)
+            {
+                Some(folder) => folder.id.as_str().to_owned(),
+                None => {
+                    connection.create_folder(ARCHIVE_FOLDER).await?;
+                    ARCHIVE_FOLDER.to_owned()
+                }
+            },
+        ),
+    };
+    let id = match destination {
+        Some(destination) => connection
+            .move_message(id, &destination)
+            .await?
+            .ok_or_else(|| transient("the moved IMAP message was not found in its folder yet"))?,
+        None => id.clone(),
+    };
+    Ok(MessageWriteReceipt {
+        id: id.to_provider_id()?,
+        version: None,
+    })
 }

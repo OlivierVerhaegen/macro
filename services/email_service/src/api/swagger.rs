@@ -19,6 +19,7 @@ use crate::api::email::labels::create::CreateLabelRequest;
 use crate::api::email::labels::create::CreateLabelResponse;
 use crate::api::email::links::list::ListLinksResponse;
 use crate::api::email::links::resync::ResyncResponse;
+use crate::api::email::links::smtp_password::SetSmtpPasswordRequest;
 use crate::api::email::messages::labels::{UpdateLabelBatchRequest, UpdateLabelBatchResponse};
 use crate::api::email::settings::patch::{PatchSettingsRequest, PatchSettingsResponse};
 use crate::api::email::threads::archived::ArchiveThreadRequest;
@@ -102,6 +103,7 @@ use utoipa::OpenApi;
         email::links::delete::delete_link_handler,
         email::links::calendar::disable_link_calendar_handler,
         email::links::resync::resync_link_handler,
+        email::links::smtp_password::set_smtp_password_handler,
         email::labels::create::handler,
         email::labels::delete::handler,
         inbound::axum::list_labels_router::list_labels_handler,
@@ -174,6 +176,7 @@ use utoipa::OpenApi;
             RefreshEmailEvent,
             BackfillStatus,
             ResyncResponse,
+            SetSmtpPasswordRequest,
             Settings,
             // Contact types
             ListContactsResponse,

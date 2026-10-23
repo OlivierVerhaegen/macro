@@ -24,6 +24,16 @@ impl UserProvider {
             UserProvider::Imap => "IMAP",
         }
     }
+
+    /// Outlook and IMAP mailboxes are synced by the mailbox runtime, which also
+    /// applies organization changes through its durable command queue. Gmail
+    /// keeps its own history sync and label operations.
+    pub fn uses_mailbox_runtime(self) -> bool {
+        match self {
+            UserProvider::Gmail => false,
+            UserProvider::Outlook | UserProvider::Imap => true,
+        }
+    }
 }
 
 /// Status of the latest initial mailbox backfill, when one exists.

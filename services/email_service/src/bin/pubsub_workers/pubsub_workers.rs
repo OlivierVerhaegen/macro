@@ -334,6 +334,14 @@ async fn main() -> anyhow::Result<()> {
             ),
             worker_cancellation_token.clone(),
         ));
+        // Read, star, move and label changes on IMAP mailboxes.
+        worker_tracker.spawn(email_service::mailbox_sync_worker::run_commands(
+            email::domain::mailbox::commands::MailboxCommandService::new(
+                imap_repository.clone(),
+                imap_gateway.clone(),
+            ),
+            worker_cancellation_token.clone(),
+        ));
     }
     let email_api_backfill = compose_email_api(
         db_backfill.clone(),
@@ -536,7 +544,7 @@ async fn main() -> anyhow::Result<()> {
                         outlook: email_service::outbound::email_api::ProviderMailboxGateway(
                             outlook_api,
                         ),
-                        imap: imap_gateway,
+                        imap: imap_gateway.clone(),
                     },
                 invitations: email::outbound::invitation_pg::InvitationPgRepository(db.clone()),
                 broker: macro_event_broker.clone(),
@@ -780,6 +788,10 @@ async fn main() -> anyhow::Result<()> {
     let db_scheduled = db.clone();
     let email_api_scheduled = email_api_live;
     let s3_client_scheduled = s3_client.clone();
+    let imap_sending = email_service::outbound::imap_mailbox::ImapSending {
+        gateway: imap_gateway.clone(),
+        auth: auth_service_client.clone(),
+    };
     let attachment_bucket_scheduled = config.attachment_bucket.to_string();
     let macro_event_broker_scheduled = macro_event_broker.clone();
     let cancellation_token = worker_cancellation_token.clone();
@@ -790,6 +802,7 @@ async fn main() -> anyhow::Result<()> {
                 sqs_worker: scheduled_worker,
                 db: db_scheduled,
                 email_api: email_api_scheduled,
+                imap: imap_sending,
                 attachment_bytes: draft_content,
                 s3_client: s3_client_scheduled,
                 attachment_bucket: attachment_bucket_scheduled,

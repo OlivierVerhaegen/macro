@@ -381,9 +381,7 @@ impl MailboxInitializationRepository for PgMailboxInitialization {
                 VALUES ($1,$2,$3,$4,$5,'tls',$6,'zoho_oauth')
                 ON CONFLICT(link_id) DO UPDATE SET imap_host = EXCLUDED.imap_host,imap_port = EXCLUDED.imap_port,
                     smtp_host = EXCLUDED.smtp_host,smtp_port = EXCLUDED.smtp_port,smtp_security = EXCLUDED.smtp_security,
-                    username = EXCLUDED.username,auth_method = EXCLUDED.auth_method,password_ciphertext = NULL,
-                    password_data_key = NULL,password_nonce = NULL,password_encryption_version = NULL,
-                    password_key_id = NULL,updated_at = now()"#,
+                    username = EXCLUDED.username,auth_method = EXCLUDED.auth_method,updated_at = now()"#,
                 link_id,server.imap_host,i32::from(server.imap_port),server.smtp_host,i32::from(server.smtp_port),server.username)
                 .execute(&mut *tx).await.map_err(unavailable)?;
         }

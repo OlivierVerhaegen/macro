@@ -35,6 +35,8 @@ pub struct ScheduledDeliveryAdapter {
         crate::outbound::forwarded_attachments::PgForwardedAttachmentRepo,
     >,
     pub email_api: GmailApi,
+    /// SMTP delivery for IMAP mailboxes (Zoho Mail).
+    pub imap: crate::outbound::imap_mailbox::ImapSending<crate::composition::ZohoTokens>,
     pub attachment_bytes:
         std::sync::Arc<dyn email::domain::attachment_access::AuthorizedAttachmentBytes>,
     pub s3_client: s3_client::S3,
@@ -90,10 +92,11 @@ impl ScheduledDeliveryRepo for ScheduledDeliveryAdapter {
             return Ok(None);
         };
         // Outlook delivery is claimed by its durable draft coordinator. This
-        // legacy adapter must never claim it or release an uncertain send.
+        // adapter must never claim it or release an uncertain send.
         if !matches!(
             link.provider,
             models_email::service::link::UserProvider::Gmail
+                | models_email::service::link::UserProvider::Imap
         ) {
             return Ok(None);
         }
@@ -262,8 +265,14 @@ impl ScheduledDeliveryRepo for ScheduledDeliveryAdapter {
 
 /// Fully prepared MIME and persistence data; contains no provider side effects.
 pub struct PreparedDelivery {
-    provider: PreparedSendMessage,
+    provider: ProviderSend,
     delivery: SentDelivery,
+}
+
+/// Gmail submits through its API; IMAP mailboxes over SMTP.
+enum ProviderSend {
+    Gmail(PreparedSendMessage),
+    Imap(crate::outbound::imap_mailbox::PreparedImapSend),
 }
 
 impl ScheduledMessageSender<ScheduledClaim, SentDelivery> for ScheduledDeliveryAdapter {
@@ -280,11 +289,26 @@ impl ScheduledMessageSender<ScheduledClaim, SentDelivery> for ScheduledDeliveryA
         _: &ScheduledClaim,
         mut prepared: PreparedDelivery,
     ) -> Result<SentDelivery, SubmissionError> {
-        let ids = self
-            .email_api
-            .send_prepared(&prepared.provider)
-            .await
-            .map_err(classify_submission_error)?;
+        let ids = match prepared.provider {
+            ProviderSend::Gmail(provider) => self
+                .email_api
+                .send_prepared(&provider)
+                .await
+                .map_err(classify_submission_error)?,
+            ProviderSend::Imap(provider) => {
+                self.imap
+                    .send(provider)
+                    .await
+                    .map_err(|error| match error {
+                        crate::outbound::imap_mailbox::ImapSendError::Refused(_) => {
+                            SubmissionError::Rejected(error.into())
+                        }
+                        crate::outbound::imap_mailbox::ImapSendError::Unknown(_) => {
+                            SubmissionError::Uncertain(error.into())
+                        }
+                    })?
+            }
+        };
         apply_sent_ids(&mut prepared.delivery.message, ids);
         Ok(prepared.delivery)
     }
@@ -293,11 +317,17 @@ impl ScheduledMessageSender<ScheduledClaim, SentDelivery> for ScheduledDeliveryA
         let Some(header) = claim.delivery.message_id_header.as_deref() else {
             return Ok(None);
         };
-        let Some(ids) = self
-            .email_api
-            .find_sent_message(claim.link.id, header)
-            .await?
-        else {
+        let found = match claim.link.provider {
+            models_email::service::link::UserProvider::Imap => {
+                self.imap.find_sent(claim.link.id, header).await?
+            }
+            _ => {
+                self.email_api
+                    .find_sent_message(claim.link.id, header)
+                    .await?
+            }
+        };
+        let Some(ids) = found else {
             return Ok(None);
         };
         let (mut message, _) = email_db_client::messages::get::get_message_to_send(
@@ -380,14 +410,20 @@ impl ScheduledDeliveryAdapter {
             references,
             message_id: claim.delivery.message_id_header.clone(),
         };
-        let provider = self
-            .email_api
-            .prepare_send(
-                claim.link.id,
-                &request,
-                message.provider_thread_id.as_deref(),
-            )
-            .await?;
+        let provider = match claim.link.provider {
+            models_email::service::link::UserProvider::Imap => {
+                ProviderSend::Imap(self.imap.prepare(claim.link.id, &request).await?)
+            }
+            _ => ProviderSend::Gmail(
+                self.email_api
+                    .prepare_send(
+                        claim.link.id,
+                        &request,
+                        message.provider_thread_id.as_deref(),
+                    )
+                    .await?,
+            ),
+        };
         tracing::info!(
             event = "email_send.mime_prepared",
             duration_ms = started.elapsed().as_millis() as u64,

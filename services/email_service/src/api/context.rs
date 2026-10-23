@@ -142,6 +142,12 @@ pub(crate) struct ApiContext {
     >,
     pub mailbox_initializer: Arc<MailboxInitializer>,
     pub imap_mailbox_initializer: Arc<ImapMailboxInitializer>,
+    pub smtp_passwords: Arc<
+        email::domain::mailbox::smtp_password::SmtpPasswordService<
+            crate::outbound::imap_mailbox::ImapSending<crate::composition::ZohoTokens>,
+            crate::outbound::imap_mailbox::ImapSending<crate::composition::ZohoTokens>,
+        >,
+    >,
     pub invitation_snapshots: email::outbound::invitation_pg::InvitationPgRepository,
     pub invitation_resolver: Arc<
         calendar_events::domain::invitations::CalendarInvitationResolver<

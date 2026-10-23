@@ -17,6 +17,7 @@ pub mod initialization;
 pub mod lifecycle;
 pub mod projection;
 pub mod settings;
+pub mod smtp_password;
 #[cfg(test)]
 mod test;
 pub mod watches;

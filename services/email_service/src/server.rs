@@ -382,6 +382,19 @@ pub async fn run() -> anyhow::Result<()> {
             )
             .with_connections_enabled(config.outlook_connections_enabled),
         ),
+        smtp_passwords: Arc::new({
+            let sending = crate::outbound::imap_mailbox::ImapSending {
+                gateway: crate::composition::imap_gateway(
+                    db.clone(),
+                    auth_service_client.as_ref().clone(),
+                ),
+                auth: auth_service_client.as_ref().clone(),
+            };
+            email::domain::mailbox::smtp_password::SmtpPasswordService::new(
+                sending.clone(),
+                sending,
+            )
+        }),
         imap_mailbox_initializer: Arc::new(
             email::domain::mailbox::initialization::MailboxInitializationService::new(
                 crate::outbound::mailbox_init::PgMailboxInitialization::for_provider(

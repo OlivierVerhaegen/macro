@@ -12,6 +12,7 @@ pub async fn run_worker(
     worker: sqs_worker::SQSWorker,
     db: PgPool,
     email_api: GmailApi,
+    imap: crate::outbound::imap_mailbox::ImapSending<crate::composition::ZohoTokens>,
     attachment_bytes: std::sync::Arc<
         dyn email::domain::attachment_access::AuthorizedAttachmentBytes,
     >,
@@ -24,6 +25,7 @@ pub async fn run_worker(
             sqs_worker: worker,
             db,
             email_api,
+            imap,
             attachment_bytes,
             s3_client,
             attachment_bucket,

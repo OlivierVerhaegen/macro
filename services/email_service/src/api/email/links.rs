@@ -4,10 +4,11 @@ pub(crate) mod delete;
 pub(crate) mod health_check;
 pub(crate) mod list;
 pub(crate) mod resync;
+pub(crate) mod smtp_password;
 
 use crate::api::ApiContext;
 use axum::Router;
-use axum::routing::{delete, get, post};
+use axum::routing::{delete, get, post, put};
 
 pub fn router() -> Router<ApiContext> {
     Router::new()
@@ -19,4 +20,8 @@ pub fn router() -> Router<ApiContext> {
             delete(calendar::disable_link_calendar_handler),
         )
         .route("/{link_id}/resync", post(resync::resync_link_handler))
+        .route(
+            "/{link_id}/smtp_password",
+            put(smtp_password::set_smtp_password_handler),
+        )
 }

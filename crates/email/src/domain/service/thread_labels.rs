@@ -10,7 +10,7 @@ use macro_event_broker::MacroEventBroker;
 use uuid::Uuid;
 
 use super::EmailServiceImpl;
-use crate::domain::models::{UserProvider, mailbox_action::MailboxAction};
+use crate::domain::models::mailbox_action::MailboxAction;
 
 /// Facts captured before a label write, used only if provider enqueue fails.
 struct ThreadLabelRollback<'a> {
@@ -51,8 +51,8 @@ where
             .await
             .map_err(|e| EmailErr::RepoErr(anyhow::Error::from(e)))?
             .ok_or(EmailErr::ThreadNotFound)?;
-        if link.provider == UserProvider::Outlook {
-            self.queue_outlook_action(&link, thread_id, actor, action)
+        if link.provider.uses_mailbox_runtime() {
+            self.queue_mailbox_action(&link, thread_id, actor, action)
                 .await?;
             return Ok(());
         }
@@ -78,7 +78,7 @@ where
 
     /// The email domain selects a bounded message set; persistence commits the
     /// accepted intent and its pending projection together.
-    pub(super) async fn queue_outlook_action(
+    pub(super) async fn queue_mailbox_action(
         &self,
         link: &Link,
         thread_id: Uuid,
@@ -132,8 +132,8 @@ where
             .await
             .map_err(|e| EmailErr::RepoErr(anyhow::Error::from(e)))?;
 
-        if link.provider == UserProvider::Outlook {
-            self.queue_outlook_action(&link, thread_id, macro_id, MailboxAction::Read(true))
+        if link.provider.uses_mailbox_runtime() {
+            self.queue_mailbox_action(&link, thread_id, macro_id, MailboxAction::Read(true))
                 .await?;
             return Ok(());
         }
@@ -180,8 +180,8 @@ where
 
         // Resolve from the authorized thread's inbox, never the caller's primary
         // inbox: multi-inbox users have a distinct UNREAD label for each link.
-        if link.provider == UserProvider::Outlook {
-            self.queue_outlook_action(&link, thread_id, macro_id, MailboxAction::Read(false))
+        if link.provider.uses_mailbox_runtime() {
+            self.queue_mailbox_action(&link, thread_id, macro_id, MailboxAction::Read(false))
                 .await?;
             return Ok(());
         }
@@ -217,8 +217,8 @@ where
             self.ensure_thread_has_received_messages(thread_id, link.id)
                 .await?;
         }
-        if link.provider == UserProvider::Outlook {
-            self.queue_outlook_action(
+        if link.provider.uses_mailbox_runtime() {
+            self.queue_mailbox_action(
                 &link,
                 thread_id,
                 macro_id,
@@ -344,9 +344,9 @@ where
             .map_err(|e| EmailErr::RepoErr(anyhow::Error::from(e)))?
             .ok_or(EmailErr::LabelNotFound)?;
 
-        if link.provider == UserProvider::Outlook {
+        if link.provider.uses_mailbox_runtime() {
             return self
-                .queue_outlook_action(
+                .queue_mailbox_action(
                     link,
                     thread_id,
                     actor.unwrap_or_else(|| link.macro_id.clone()),
