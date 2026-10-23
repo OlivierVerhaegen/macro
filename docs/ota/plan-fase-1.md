@@ -270,15 +270,15 @@ draaien voor elke commit.
 
 1. **CAPABILITY-uitvoer** (sectie 2). Bepaalt CONDSTORE/QRESYNC, OBJECTID en
    de SMTP-auth.
-2. **Merge-vriendelijkheid**: een nieuwe provider raakt onvermijdelijk
+2. **Akkoord.** Merge-vriendelijkheid: een nieuwe provider raakt onvermijdelijk
    upstream-bestanden (enum, ~40 SQL-filters, workercompositie). Akkoord dat
    die aanpassingen klein en expliciet in upstream-bestanden komen, en al het
    overige in `ota_*`?
-3. **Threading**: akkoord met threads op `References` in plaats van Zoho's
+3. **Akkoord.** Threading: threads op `References` in plaats van Zoho's
    `threadId`? De API-limiet maakt `threadId` per bericht onhaalbaar.
 4. ~~KMS bij zelf hosten~~ **Besloten**: eigen VPS, dus een lokale
    sleutelbron (sectie 3.2).
-5. **UI-taal**: de web-app heeft geen i18n-laag; alle teksten zijn Engels.
+5. **Akkoord.** UI-taal: de web-app heeft geen i18n-laag; alle teksten zijn Engels.
    Voorstel: nieuwe teksten in het Engels, zodat ze passen bij de rest.
    Nederlands vraagt eerst een i18n-laag voor de hele app, en dat valt buiten
    fase 1.
