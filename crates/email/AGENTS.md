@@ -67,7 +67,9 @@ tools — hexagonal, heavily feature-gated.
 - The mailbox runtime serves Outlook and IMAP (Zoho Mail). `PgMailboxSync::new`
   claims Outlook work; `PgMailboxSync::for_provider(db, UserProvider::Imap)`
   claims IMAP work, so each provider's workers run with their own gateway.
-  Watches, contacts and mailbox settings stay Outlook-only.
+  Watches, contacts and mailbox settings stay Outlook-only. Disconnect queues
+  `RevokeMicrosoftGrant` only for Outlook; the authentication service collects
+  unreferenced Zoho grants and SMTP app passwords itself.
 - Outlook organization commands only run in their link's current
   `sync_generation`. Anything that bumps it must rebind unfinished commands as
   `pending`, since claims skip `confirming` ones while those still block later

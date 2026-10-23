@@ -86,7 +86,8 @@ SMTP server takes no OAuth, so sending needs an app password from Zoho
 Accounts. **Save** checks it with Zoho first; a refused password shows
 "Zoho rejected this app password" and stays in the field, an accepted one
 clears it. Reconnecting a Zoho inbox opens the provider dialog again, since its
-data center is not stored.
+data center is not stored. **Remove** on an owned Zoho inbox adds that Zoho keeps
+the access and app password until they are revoked in Zoho Accounts.
 
 ### Notification permission prompt
 

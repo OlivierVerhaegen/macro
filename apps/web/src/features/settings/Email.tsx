@@ -103,6 +103,7 @@ export function EmailCard(
     id: string;
     email: string;
     isOwn: boolean;
+    provider: EmailLink['provider'];
   } | null>(null);
   const [turnOffCalendarTarget, setTurnOffCalendarTarget] =
     createSignal<TurnOffCalendarTarget | null>(null);
@@ -228,6 +229,7 @@ export function EmailCard(
                     id: primary().id,
                     email: primary().email_address,
                     isOwn: primary().macro_id === userId(),
+                    provider: primary().provider,
                   })
                 }
                 onTurnOffCalendar={() =>
@@ -281,6 +283,7 @@ export function EmailCard(
                     id: link.id,
                     email: link.email_address,
                     isOwn: link.macro_id === userId(),
+                    provider: link.provider,
                   })
                 }
                 onTurnOffCalendar={() =>
@@ -348,6 +351,11 @@ export function EmailCard(
                 Remove <span class="text-ink">{removeTarget()?.email}</span>?
                 This clears all of its email data from Macro and cannot be
                 undone.
+                <Show when={removeTarget()?.provider === 'IMAP'}>
+                  {' '}
+                  Macro forgets its Zoho access and app password, but Zoho keeps
+                  them: revoke both in Zoho Accounts.
+                </Show>
               </Show>
             </Dialog.Description>
             <div class="pt-3 justify-end items-center gap-3 inline-flex">

@@ -82,6 +82,16 @@ impl ZohoGrantRepository for PgZohoGrants {
         .await
         .map_err(database_error)?
         .rows_affected();
+        // App passwords outlive a disconnect until their last IMAP link is gone.
+        sqlx::query!(
+            r#"DELETE FROM smtp_passwords s WHERE NOT EXISTS(
+            SELECT 1 FROM email_links l WHERE l.provider = 'IMAP'
+                AND l.fusionauth_user_id = s.fusionauth_user_id
+                AND lower(l.email_address) = s.email_address)"#
+        )
+        .execute(&mut *tx)
+        .await
+        .map_err(database_error)?;
         tx.commit().await.map_err(database_error)?;
         Ok(removed)
     }

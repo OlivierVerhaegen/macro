@@ -184,6 +184,27 @@ async fn final_shared_disconnect_freezes_ingestion_and_keeps_revocation_after_ca
 }
 
 #[sqlx::test(migrator = "MACRO_DB_MIGRATIONS")]
+async fn disconnecting_an_imap_inbox_leaves_its_zoho_grant_to_collection(db: PgPool) {
+    let (repo, link, _) = shared(&db).await;
+    sqlx::query!("UPDATE email_links SET provider = 'IMAP' WHERE id = $1", link)
+        .execute(&db)
+        .await
+        .unwrap();
+    let service = InboxLifecycleService::new(repo, Effects);
+    service.remove(&actor("remaining"), link).await.unwrap();
+    service.remove(&actor("leaving"), link).await.unwrap();
+    let kinds = sqlx::query_scalar!(
+        r#"SELECT payload->>'kind' AS "kind!" FROM email_mailbox_lifecycle_outbox WHERE link_id = $1"#,
+        link
+    )
+    .fetch_all(&db)
+    .await
+    .unwrap();
+    assert!(kinds.iter().any(|kind| kind == "delete_mailbox"));
+    assert!(!kinds.iter().any(|kind| kind == "revoke_microsoft_grant"));
+}
+
+#[sqlx::test(migrator = "MACRO_DB_MIGRATIONS")]
 async fn deleting_a_macro_account_releases_only_its_shared_participation(db: PgPool) {
     let (repo, link, replacement) = shared(&db).await;
     // The authentication account deletion may already have cascaded its edge.

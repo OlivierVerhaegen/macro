@@ -49,3 +49,37 @@ async fn only_the_active_binding_resolves_and_a_new_password_replaces_the_old(db
 
     assert_eq!(repo.load(&owner).await.unwrap(), Some(envelope(2)));
 }
+
+#[sqlx::test(migrator = "MACRO_DB_MIGRATIONS")]
+async fn a_password_is_collected_once_its_last_imap_link_is_gone(db: PgPool) {
+    use crate::domain::zoho::ZohoGrantRepository;
+
+    let repo = PgSmtpPasswords::new(db.clone());
+    let grants = crate::outbound::zoho::PgZohoGrants::new(db.clone());
+    let link_id = imap_link(&db).await;
+    let owner = repo
+        .owner(MailboxBinding {
+            link_id,
+            grant_generation: 1,
+            sync_generation: 1,
+        })
+        .await
+        .unwrap();
+    repo.store(&owner, &envelope(1)).await.unwrap();
+
+    grants
+        .collect_expired_grants(chrono::Utc::now(), 10)
+        .await
+        .unwrap();
+    assert_eq!(repo.load(&owner).await.unwrap(), Some(envelope(1)));
+
+    sqlx::query!("DELETE FROM email_links WHERE id = $1", link_id)
+        .execute(&db)
+        .await
+        .unwrap();
+    grants
+        .collect_expired_grants(chrono::Utc::now(), 10)
+        .await
+        .unwrap();
+    assert_eq!(repo.load(&owner).await.unwrap(), None);
+}

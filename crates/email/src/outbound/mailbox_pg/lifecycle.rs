@@ -224,6 +224,11 @@ impl InboxLifecycleRepository for PgMailboxSync {
                 }
             }
         }
+        // Released Zoho grants are collected by the authentication service
+        // once no link or custodian references them.
+        if current.provider != UserProvider::Outlook {
+            revoke.clear();
+        }
         revoke.sort_by_key(|grant| (grant.grant_id, grant.grant_generation));
         revoke.dedup_by_key(|grant| (grant.grant_id, grant.grant_generation));
         for grant in revoke {
