@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM smtp_passwords s WHERE NOT EXISTS(\n            SELECT 1 FROM email_links l WHERE l.provider = 'IMAP'\n                AND l.fusionauth_user_id = s.fusionauth_user_id\n                AND lower(l.email_address) = s.email_address)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "e164f98053b23ed9781df6bc405f84921b8d9a09148e5f5599ddf7d5e5ed21f3"
+}

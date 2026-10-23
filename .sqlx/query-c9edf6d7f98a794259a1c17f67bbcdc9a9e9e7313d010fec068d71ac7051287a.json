@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT g.grant_id, g.generation, g.email_address, g.data_center, g.zoho_user_id,\n                g.zoho_account_id, g.scopes\n            FROM in_progress_user_link p\n            JOIN zoho_link_attempts a ON a.id = p.id AND a.completed_at IS NOT NULL\n            JOIN zoho_oauth_grants g ON g.grant_id = a.grant_id\n                AND g.fusionauth_user_id = p.macro_user_id::text AND g.email_address = p.linked_email\n            WHERE p.id = $1 AND p.macro_user_id = $2 AND p.email_provider = 'IMAP'\n                AND p.created_at > now() - interval '24 hours' AND g.revoked_at IS NULL\n        ",
+  "query": "\n            SELECT g.grant_id, g.generation, g.email_address, g.data_center, g.zoho_user_id,\n                g.zoho_account_id, g.scopes, g.send_addresses\n            FROM in_progress_user_link p\n            JOIN zoho_link_attempts a ON a.id = p.id AND a.completed_at IS NOT NULL\n            JOIN zoho_oauth_grants g ON g.grant_id = a.grant_id\n                AND g.fusionauth_user_id = p.macro_user_id::text AND g.email_address = p.linked_email\n            WHERE p.id = $1 AND p.macro_user_id = $2 AND p.email_provider = 'IMAP'\n                AND p.created_at > now() - interval '24 hours' AND g.revoked_at IS NULL\n        ",
   "describe": {
     "columns": [
       {
@@ -37,6 +37,11 @@
         "ordinal": 6,
         "name": "scopes",
         "type_info": "TextArray"
+      },
+      {
+        "ordinal": 7,
+        "name": "send_addresses",
+        "type_info": "TextArray"
       }
     ],
     "parameters": {
@@ -52,8 +57,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "badfa207179fd739777c7ceed851c1d10222f503a4652e19e81c7243a5e7f306"
+  "hash": "c9edf6d7f98a794259a1c17f67bbcdc9a9e9e7313d010fec068d71ac7051287a"
 }
