@@ -93,3 +93,72 @@ fn unavailable() -> AuthServiceClientError {
         message: "Zoho access token is temporarily unavailable".into(),
     })
 }
+
+/// Secret-bearing response intentionally does not implement Debug.
+#[derive(serde::Deserialize)]
+pub struct SmtpPassword {
+    pub password: String,
+}
+
+impl AuthServiceClient {
+    /// Store an SMTP password the caller verified with the mailbox's server.
+    pub async fn store_smtp_password(
+        &self,
+        link_id: uuid::Uuid,
+        generation: i64,
+        sync_generation: i64,
+        password: &str,
+    ) -> Result<(), AuthServiceClientError> {
+        #[derive(serde::Serialize)]
+        struct Request<'a> {
+            link_id: uuid::Uuid,
+            generation: i64,
+            sync_generation: i64,
+            password: &'a str,
+        }
+        let response = self
+            .client
+            .post(format!("{}/internal/smtp_password", self.url))
+            .json(&Request {
+                link_id,
+                generation,
+                sync_generation,
+                password,
+            })
+            .send()
+            .await
+            .map_err(|_| unavailable())?;
+        match response.status() {
+            reqwest::StatusCode::NO_CONTENT => Ok(()),
+            reqwest::StatusCode::UNAUTHORIZED => Err(AuthServiceClientError::Unauthorized),
+            reqwest::StatusCode::NOT_FOUND => Err(AuthServiceClientError::NotFound),
+            _ => Err(unavailable()),
+        }
+    }
+
+    /// The SMTP password for an active IMAP link's exact binding.
+    pub async fn get_smtp_password(
+        &self,
+        link_id: uuid::Uuid,
+        generation: i64,
+        sync_generation: i64,
+    ) -> Result<SmtpPassword, AuthServiceClientError> {
+        let response = self
+            .client
+            .get(format!("{}/internal/smtp_password", self.url))
+            .query(&[
+                ("link_id", link_id.to_string()),
+                ("generation", generation.to_string()),
+                ("sync_generation", sync_generation.to_string()),
+            ])
+            .send()
+            .await
+            .map_err(|_| unavailable())?;
+        match response.status() {
+            reqwest::StatusCode::OK => response.json().await.map_err(|_| unavailable()),
+            reqwest::StatusCode::UNAUTHORIZED => Err(AuthServiceClientError::Unauthorized),
+            reqwest::StatusCode::NOT_FOUND => Err(AuthServiceClientError::NotFound),
+            _ => Err(unavailable()),
+        }
+    }
+}

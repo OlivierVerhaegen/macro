@@ -246,9 +246,33 @@ pub async fn run() -> anyhow::Result<()> {
             .with_connections_enabled(config.outlook_connections_enabled),
         ) as Arc<dyn MicrosoftAuth>
     });
-    let zoho_auth = config
+    let zoho_credentials = config
         .zoho_credentials()
-        .context("invalid Zoho OAuth configuration")?
+        .context("invalid Zoho OAuth configuration")?;
+    // SMTP app passwords share the local master key with Zoho tokens, under
+    // their own envelope purpose.
+    let smtp_passwords = zoho_credentials
+        .as_ref()
+        .map(|credentials| -> anyhow::Result<_> {
+            use crate::{
+                domain::smtp_password::{
+                    SMTP_PASSWORD_PURPOSE, SmtpPasswordService, SmtpPasswords,
+                },
+                microsoft_token_cipher::local::LocalDataKeyProvider,
+                outbound::smtp_password::PgSmtpPasswords,
+            };
+            Ok(Arc::new(SmtpPasswordService::new(
+                PgSmtpPasswords::new(db.clone()),
+                Arc::new(
+                    EnvelopeMicrosoftTokenCipher::new(LocalDataKeyProvider::from_base64(
+                        &credentials.token_encryption_key,
+                    )?)
+                    .with_purpose(SMTP_PASSWORD_PURPOSE),
+                ),
+            )) as Arc<dyn SmtpPasswords>)
+        })
+        .transpose()?;
+    let zoho_auth = zoho_credentials
         .map(|credentials| -> anyhow::Result<_> {
             use crate::{
                 domain::zoho::{ZOHO_TOKEN_PURPOSE, ZohoAuth, ZohoAuthService},
@@ -707,6 +731,7 @@ pub async fn run() -> anyhow::Result<()> {
             auth_client: Arc::new(auth_client),
             microsoft_auth,
             zoho_auth,
+            smtp_passwords,
             cursor_api_key_cipher,
             codex_connection,
             macro_cache_client: Arc::new(macro_cache_client),

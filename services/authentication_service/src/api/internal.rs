@@ -16,6 +16,7 @@ mod post_get_existing_users;
 mod relocate_inbox_grant;
 mod remove_link;
 mod revoke_microsoft_grant;
+mod smtp_password;
 mod zoho;
 
 #[cfg(test)]
@@ -35,6 +36,10 @@ pub fn router() -> Router<ApiContext> {
         )
         .route("/zoho_grant", get(zoho::grant_handler))
         .route("/zoho_access_token", get(zoho::access_token_handler))
+        .route(
+            "/smtp_password",
+            get(smtp_password::read_handler).post(smtp_password::store_handler),
+        )
         .route("/get_names", post(post_get_names::handler_internal))
         .route("/get_existing_users", get(post_get_existing_users::handler))
         .route("/remove_link", delete(remove_link::handler))

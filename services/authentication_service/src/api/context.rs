@@ -59,6 +59,7 @@ use tokio_util::task::TaskTracker;
 
 use crate::account_link_state::AccountLinkStateKey;
 use crate::domain::microsoft::MicrosoftAuth;
+use crate::domain::smtp_password::SmtpPasswords;
 use crate::domain::zoho::ZohoAuth;
 use crate::service::signup_policy::SignupPolicy;
 use cursor_api_key::cipher::CursorApiKeyCipher;
@@ -162,6 +163,8 @@ pub(crate) struct ApiContext {
     pub microsoft_auth: Option<Arc<dyn MicrosoftAuth>>,
     /// Zoho Mail linking (Olive Trees fork); `None` when Zoho is not configured.
     pub zoho_auth: Option<Arc<dyn ZohoAuth>>,
+    /// SMTP app passwords for IMAP mailboxes; configured together with Zoho.
+    pub smtp_passwords: Option<Arc<dyn SmtpPasswords>>,
     /// Encrypts users' Cursor API keys.
     pub cursor_api_key_cipher: Arc<dyn CursorApiKeyCipher>,
     /// Owner-bound Codex OAuth lifecycle and cloud target settings.

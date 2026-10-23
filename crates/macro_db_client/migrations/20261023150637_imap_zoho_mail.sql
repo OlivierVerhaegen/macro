@@ -46,8 +46,7 @@ CREATE TABLE zoho_link_attempts (
     grant_id uuid REFERENCES zoho_oauth_grants(grant_id) ON DELETE SET NULL
 );
 
--- Server settings for every IMAP mailbox. Deleted with its link. A password is
--- stored only for password authentication, as an envelope like OAuth grants.
+-- Server settings for every IMAP mailbox. Deleted with its link.
 CREATE TABLE imap_accounts (
     link_id uuid PRIMARY KEY REFERENCES email_links(id) ON DELETE CASCADE,
     imap_host text NOT NULL CHECK (imap_host <> ''),
@@ -57,18 +56,22 @@ CREATE TABLE imap_accounts (
     smtp_security text NOT NULL CHECK (smtp_security IN ('tls','starttls')),
     username text NOT NULL CHECK (username <> ''),
     auth_method text NOT NULL CHECK (auth_method IN ('zoho_oauth','password')),
-    password_ciphertext bytea,
-    password_data_key bytea,
-    password_nonce bytea CHECK (octet_length(password_nonce) = 12),
-    password_encryption_version integer,
-    password_key_id text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- SMTP passwords (Zoho app passwords) held by the authentication service, as
+-- envelopes bound to the owner and address like OAuth grants. Zoho's SMTP
+-- server accepts no OAuth. Kept until the owner replaces or removes it.
+CREATE TABLE smtp_passwords (
+    fusionauth_user_id text NOT NULL CHECK (fusionauth_user_id <> ''),
+    email_address text NOT NULL CHECK (email_address <> '' AND email_address = lower(email_address)),
+    password_ciphertext bytea NOT NULL CHECK (octet_length(password_ciphertext) > 0),
+    encrypted_data_key bytea NOT NULL CHECK (octet_length(encrypted_data_key) > 0),
+    nonce bytea NOT NULL CHECK (octet_length(nonce) = 12),
+    encryption_version integer NOT NULL CHECK (encryption_version > 0),
+    kms_key_id text NOT NULL CHECK (kms_key_id <> ''),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT imap_accounts_password_envelope CHECK (
-        (auth_method = 'password') = (
-            password_ciphertext IS NOT NULL AND password_data_key IS NOT NULL
-            AND password_nonce IS NOT NULL AND password_encryption_version IS NOT NULL
-            AND password_key_id IS NOT NULL
-        )
-    )
+    PRIMARY KEY (fusionauth_user_id, email_address)
 );
