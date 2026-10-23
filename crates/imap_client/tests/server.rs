@@ -209,6 +209,59 @@ async fn snapshots_moves_and_deletes_follow_the_message() {
 }
 
 #[tokio::test]
+async fn organization_follows_flags_and_archive_folders_are_created_once() {
+    let Some(test) = test_server() else { return };
+    let mut connection = connect(&test, &user()).await;
+    let folders = connection.folders().await.unwrap();
+    let id = connection
+        .append("INBOX", &[], &message("<organize@example.com>", None))
+        .await
+        .unwrap()
+        .expect("the appended message is found by Message-ID");
+    assert_eq!(
+        connection
+            .find("INBOX", "<organize@example.com>")
+            .await
+            .unwrap(),
+        Some(id.clone())
+    );
+
+    let before = connection
+        .organization(&id, &folders)
+        .await
+        .unwrap()
+        .expect("message exists");
+    assert!(!before.state.is_read && before.state.in_inbox);
+    connection
+        .set_flag(&id, SystemFlag::Seen, true)
+        .await
+        .unwrap();
+    let after = connection
+        .organization(&id, &folders)
+        .await
+        .unwrap()
+        .expect("message exists");
+    assert!(after.state.is_read);
+    assert_ne!(before.version, after.version);
+
+    connection.create_folder("Archive").await.unwrap();
+    connection.create_folder("Archive").await.unwrap();
+    let archived = connection
+        .move_message(&id, "Archive")
+        .await
+        .unwrap()
+        .expect("the moved message is found in Archive");
+    assert!(
+        connection
+            .organization(&id, &folders)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    connection.delete(&archived).await.unwrap();
+}
+
+#[tokio::test]
 async fn wrong_credentials_are_an_authentication_failure() {
     let Some(test) = test_server() else { return };
 

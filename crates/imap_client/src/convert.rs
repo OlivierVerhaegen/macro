@@ -35,16 +35,7 @@ pub(crate) fn to_mailbox_message(
     let folder_id =
         ProviderId::new(id.folder.clone()).map_err(|_| ImapError::MalformedIdentifier)?;
     let role = MailFolder::effective_role(folders, Some(&folder_id));
-    let has_flag = |name: &str| raw.flags.iter().any(|flag| flag.eq_ignore_ascii_case(name));
-    let state = MailboxState {
-        is_read: has_flag("\\Seen"),
-        is_flagged: has_flag("\\Flagged"),
-        is_draft: has_flag("\\Draft") || role == FolderRole::Drafts,
-        in_inbox: role == FolderRole::Inbox,
-        in_trash: role == FolderRole::Trash,
-        in_junk: role == FolderRole::Junk,
-        attention: Attention::Unknown,
-    };
+    let state = state(&raw.flags, role);
 
     // A message without Message-ID still needs a stable thread key.
     let message_id = header("Message-ID")
@@ -136,22 +127,44 @@ pub(crate) fn to_mailbox_message(
         },
         state,
         folder_id: Some(folder_id),
-        // IMAP keywords are the closest thing to tags; system flags are state.
-        tags: raw
-            .flags
-            .iter()
-            .filter(|flag| !flag.starts_with('\\') && !flag.starts_with('$'))
-            .cloned()
-            .collect(),
-        version: Some(match raw.modseq {
-            Some(modseq) => modseq.to_string(),
-            None => {
-                let mut flags = raw.flags.clone();
-                flags.sort();
-                flags.join(" ")
-            }
-        }),
+        tags: tags(&raw.flags),
+        version: Some(version(&raw.flags, raw.modseq)),
     })
+}
+
+/// Mailbox facts carried by flags and the folder's role.
+pub(crate) fn state(flags: &[String], role: FolderRole) -> MailboxState {
+    let has_flag = |name: &str| flags.iter().any(|flag| flag.eq_ignore_ascii_case(name));
+    MailboxState {
+        is_read: has_flag("\\Seen"),
+        is_flagged: has_flag("\\Flagged"),
+        is_draft: has_flag("\\Draft") || role == FolderRole::Drafts,
+        in_inbox: role == FolderRole::Inbox,
+        in_trash: role == FolderRole::Trash,
+        in_junk: role == FolderRole::Junk,
+        attention: Attention::Unknown,
+    }
+}
+
+/// IMAP keywords are the closest thing to tags; system flags are state.
+pub(crate) fn tags(flags: &[String]) -> Vec<String> {
+    flags
+        .iter()
+        .filter(|flag| !flag.starts_with('\\') && !flag.starts_with('$'))
+        .cloned()
+        .collect()
+}
+
+/// MODSEQ when the server has CONDSTORE, else the sorted flags.
+pub(crate) fn version(flags: &[String], modseq: Option<u64>) -> String {
+    match modseq {
+        Some(modseq) => modseq.to_string(),
+        None => {
+            let mut flags = flags.to_vec();
+            flags.sort();
+            flags.join(" ")
+        }
+    }
 }
 
 /// The conversation root: the first `References` id, else `In-Reply-To`.

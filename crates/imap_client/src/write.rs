@@ -207,8 +207,9 @@ impl ImapConnection {
             .map(|value| value.trim().to_owned()))
     }
 
-    /// The newest message in `folder` with this Message-ID.
-    async fn find(
+    /// The newest message in `folder` with this Message-ID (`<...>`).
+    #[tracing::instrument(name = "imap.find_message", skip_all, err)]
+    pub async fn find(
         &mut self,
         folder: &str,
         message_id: &str,

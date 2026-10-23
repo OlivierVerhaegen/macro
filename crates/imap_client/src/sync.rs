@@ -1,13 +1,16 @@
 use std::collections::HashSet;
 
 use email_api_client::domain::models::{
-    MailFolder, MailboxChangePage, MailboxMessage, ProviderId, StreamPosition, StreamToken,
+    FolderRole, MailFolder, MailboxChangePage, MailboxMessage, MailboxOrganization, ProviderId,
+    StreamPosition, StreamToken,
 };
 use futures::TryStreamExt;
 use uuid::Uuid;
 
 use crate::{
-    ImapConnection, ImapError, ImapMessageId, convert::to_mailbox_message, position::FolderPosition,
+    ImapConnection, ImapError, ImapMessageId,
+    convert::{self, to_mailbox_message},
+    position::FolderPosition,
 };
 
 #[cfg(test)]
@@ -167,6 +170,58 @@ impl ImapConnection {
             uid_validity: selected.uid_validity,
             uids: self.session.uid_search("ALL").await?,
         })
+    }
+
+    /// Flags, folder and version without the body, for read-before-write
+    /// reconciliation. `None` when the message is no longer at `id`.
+    #[tracing::instrument(name = "imap.fetch_organization", skip_all, err)]
+    pub async fn organization(
+        &mut self,
+        id: &ImapMessageId,
+        folders: &[MailFolder],
+    ) -> Result<Option<MailboxOrganization>, ImapError> {
+        let selected = self.select_folder(&id.folder).await?;
+        if selected.uid_validity != id.uid_validity {
+            return Ok(None);
+        }
+        let items = if self.condstore {
+            "(UID FLAGS MODSEQ)"
+        } else {
+            "(UID FLAGS)"
+        };
+        let fetches = self
+            .session
+            .uid_fetch(id.uid.to_string(), items)
+            .await?
+            .try_collect::<Vec<_>>()
+            .await?;
+        let Some(fetch) = fetches.into_iter().find(|fetch| fetch.uid == Some(id.uid)) else {
+            return Ok(None);
+        };
+        let flags = fetch
+            .flags()
+            .map(|flag| flag_name(&flag))
+            .collect::<Vec<_>>();
+        let folder_id =
+            ProviderId::new(id.folder.clone()).map_err(|_| ImapError::MalformedIdentifier)?;
+        let role = MailFolder::effective_role(folders, Some(&folder_id));
+        Ok(Some(MailboxOrganization {
+            state: convert::state(&flags, role),
+            tags: convert::tags(&flags),
+            version: Some(convert::version(&flags, fetch.modseq)),
+            is_sent: role == FolderRole::Sent,
+            folder_id: Some(folder_id),
+        }))
+    }
+
+    /// Create a folder; an existing one with that name is success.
+    #[tracing::instrument(name = "imap.create_folder", skip_all, err)]
+    pub async fn create_folder(&mut self, name: &str) -> Result<(), ImapError> {
+        match self.session.create(name).await {
+            Ok(()) => Ok(()),
+            Err(async_imap::error::Error::No(_)) => Ok(()),
+            Err(error) => Err(error.into()),
+        }
     }
 
     /// A current snapshot, or `None` when the message is no longer at `id`.
