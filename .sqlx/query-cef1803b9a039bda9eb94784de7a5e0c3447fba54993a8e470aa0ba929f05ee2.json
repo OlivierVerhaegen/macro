@@ -1,0 +1,96 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT g.grant_id, g.generation, g.revision, g.fusionauth_user_id, g.email_address,\n                g.data_center, g.zoho_account_id, g.scopes, g.refresh_token_ciphertext,\n                g.encrypted_data_key, g.nonce, g.encryption_version, g.kms_key_id\n            FROM zoho_oauth_grants g JOIN email_links l ON l.grant_id = g.grant_id\n                AND l.grant_generation = g.generation AND l.fusionauth_user_id = g.fusionauth_user_id\n                AND lower(l.email_address) = g.email_address\n            WHERE l.id = $1 AND g.generation = $2 AND l.provider = 'IMAP'\n                AND l.is_sync_active AND l.sync_generation = $3 AND g.revoked_at IS NULL\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "grant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "generation",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "revision",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "fusionauth_user_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "email_address",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "data_center",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "zoho_account_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "scopes",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 8,
+        "name": "refresh_token_ciphertext",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 9,
+        "name": "encrypted_data_key",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 10,
+        "name": "nonce",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 11,
+        "name": "encryption_version",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 12,
+        "name": "kms_key_id",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "cef1803b9a039bda9eb94784de7a5e0c3447fba54993a8e470aa0ba929f05ee2"
+}

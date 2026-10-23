@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT (EXISTS(SELECT 1 FROM in_progress_user_link WHERE id = $1\n                AND macro_user_id = $2 AND email_provider::text = $4) OR\n                EXISTS(SELECT 1 FROM email_link_initializations i JOIN email_links l ON l.id = i.link_id\n                    WHERE i.attempt_id = $1 AND i.actor_id = $3 AND l.provider::text = $4)) AS \"recognized!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "recognized!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "20cacc218998d481291d40b13d42bc3ee837d1a0c7d9aa58722ec91e0022b871"
+}

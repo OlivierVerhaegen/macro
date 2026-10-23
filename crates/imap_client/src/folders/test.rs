@@ -83,3 +83,27 @@ fn a_role_is_assigned_once() {
     assert_eq!(role_of(&folders, "Trash"), FolderRole::Trash);
     assert_eq!(role_of(&folders, "Old Trash"), FolderRole::Other);
 }
+
+#[test]
+fn zoho_localized_folders_take_their_role_from_the_flags() {
+    // From `LIST "" "*"` on imap.zoho.eu for a Dutch-language account.
+    let folders = catalog(vec![
+        listed("INBOX", None),
+        listed("Concept", Some(FolderRole::Drafts)),
+        listed("Template", None),
+        listed("Verzonden", Some(FolderRole::Sent)),
+        listed("Spam", Some(FolderRole::Junk)),
+        listed("Afval", Some(FolderRole::Trash)),
+        listed("Klanten", None),
+        listed("Klanten/Okono", None),
+        listed("Snoozed", None),
+    ])
+    .unwrap();
+
+    assert_eq!(role_of(&folders, "Concept"), FolderRole::Drafts);
+    assert_eq!(role_of(&folders, "Verzonden"), FolderRole::Sent);
+    assert_eq!(role_of(&folders, "Spam"), FolderRole::Junk);
+    assert_eq!(role_of(&folders, "Afval"), FolderRole::Trash);
+    assert_eq!(role_of(&folders, "Template"), FolderRole::Other);
+    assert_eq!(role_of(&folders, "Klanten/Okono"), FolderRole::Other);
+}

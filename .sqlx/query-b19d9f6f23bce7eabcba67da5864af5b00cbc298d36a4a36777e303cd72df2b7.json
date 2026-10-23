@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO zoho_oauth_grants\n                (grant_id, fusionauth_user_id, email_address, data_center, zoho_user_id,\n                 zoho_account_id, scopes, refresh_token_ciphertext, encrypted_data_key, nonce,\n                 encryption_version, kms_key_id, generation)\n            SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,\n                COALESCE((SELECT max(g.generation) FROM zoho_oauth_grants g\n                    WHERE g.fusionauth_user_id = $2 AND g.email_address = $3), 0) + 1\n            WHERE NOT EXISTS(SELECT 1 FROM zoho_oauth_grants g\n                WHERE g.fusionauth_user_id = $2 AND g.email_address = $3\n                    AND (g.zoho_user_id <> $5 OR g.zoho_account_id <> $6 OR g.data_center <> $4))\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "TextArray",
+        "Bytea",
+        "Bytea",
+        "Bytea",
+        "Int4",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b19d9f6f23bce7eabcba67da5864af5b00cbc298d36a4a36777e303cd72df2b7"
+}

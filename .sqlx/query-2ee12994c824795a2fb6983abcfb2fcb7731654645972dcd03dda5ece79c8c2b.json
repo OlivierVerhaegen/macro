@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT imap_host, imap_port, username, auth_method FROM imap_accounts WHERE link_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "imap_host",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "imap_port",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "username",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "auth_method",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "2ee12994c824795a2fb6983abcfb2fcb7731654645972dcd03dda5ece79c8c2b"
+}

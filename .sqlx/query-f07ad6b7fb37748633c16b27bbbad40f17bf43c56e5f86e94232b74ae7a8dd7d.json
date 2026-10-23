@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO zoho_link_attempts\n                (id, data_center, redirect_uri, return_uri, pkce_verifier, expires_at)\n            VALUES ($1, $2, $3, $4, $5, $6)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f07ad6b7fb37748633c16b27bbbad40f17bf43c56e5f86e94232b74ae7a8dd7d"
+}

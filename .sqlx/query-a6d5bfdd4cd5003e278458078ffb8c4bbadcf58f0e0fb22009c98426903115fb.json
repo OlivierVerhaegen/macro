@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE zoho_link_attempts a SET completed_at = now(), pkce_verifier = '', grant_id = $3\n            FROM in_progress_user_link p\n            WHERE a.id = $1 AND p.id = a.id AND p.macro_user_id = $2\n                AND p.email_provider = 'IMAP' AND a.claimed_at IS NOT NULL\n                AND a.completed_at IS NULL AND a.expires_at > now()\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a6d5bfdd4cd5003e278458078ffb8c4bbadcf58f0e0fb22009c98426903115fb"
+}

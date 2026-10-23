@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT sync_generation,needs_reauth FROM email_links WHERE id = $1 AND grant_generation = $2 AND is_sync_active AND provider = 'OUTLOOK' AND sync_generation = $3 FOR UPDATE",
+  "query": "SELECT sync_generation,needs_reauth FROM email_links WHERE id = $1 AND grant_generation = $2 AND is_sync_active AND provider::text = $4 AND sync_generation = $3 FOR UPDATE",
   "describe": {
     "columns": [
       {
@@ -18,7 +18,8 @@
       "Left": [
         "Uuid",
         "Int8",
-        "Int8"
+        "Int8",
+        "Text"
       ]
     },
     "nullable": [
@@ -26,5 +27,5 @@
       false
     ]
   },
-  "hash": "91b7c2d60c73706c9e081c6521faf255151b5da5e13d6efa3d952dd7b2131d6e"
+  "hash": "c047cc3b964be8f475089344536395c170ab5bfb3a7c1ad75a2626cf4bbf0d3d"
 }

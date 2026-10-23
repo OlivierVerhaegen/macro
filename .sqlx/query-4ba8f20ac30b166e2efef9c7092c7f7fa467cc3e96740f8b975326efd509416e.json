@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM in_progress_user_link WHERE id IN (\n            SELECT p.id FROM in_progress_user_link p JOIN zoho_link_attempts a ON a.id = p.id\n            WHERE p.email_provider = 'IMAP' AND p.created_at <= $1::timestamptz\n            ORDER BY p.created_at LIMIT $2 FOR UPDATE OF p SKIP LOCKED)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4ba8f20ac30b166e2efef9c7092c7f7fa467cc3e96740f8b975326efd509416e"
+}

@@ -282,10 +282,13 @@ draaien voor elke commit.
      klopt.
    - Geen QRESYNC (`ENABLE QRESYNC` antwoordt OK zonder `* ENABLED`):
      verwijderingen komen uit de vergelijking van UID's, zoals gebouwd.
-   - Geen SPECIAL-USE, wel XLIST: maprollen komen uit de namenlijst; de echte
-     Zoho-mapnamen nog controleren met `LIST "" "*"`.
+   - SPECIAL-USE staat niet in CAPABILITY, maar `LIST` geeft de vlaggen wel
+     (`\Drafts` Concept, `\Sent` Verzonden, `\Junk` Spam, `\Trash` Afval).
+     De namen zijn gelokaliseerd, dus de rollen komen uit de vlaggen. Er is
+     geen archiefmap.
    - Geen OBJECTID: bericht-ID's blijven `map/UIDVALIDITY/UID`.
-   - SMTP (`EHLO` op `smtp.zoho.eu:465`) nog niet getest.
+   - SMTP op `smtp.zoho.eu:465` biedt alleen `AUTH LOGIN PLAIN` (geen
+     XOAUTH2), met `SIZE 53477376`.
 2. **Akkoord.** Merge-vriendelijkheid: een nieuwe provider raakt onvermijdelijk
    upstream-bestanden (enum, ~40 SQL-filters, workercompositie). Akkoord dat
    die aanpassingen klein en expliciet in upstream-bestanden komen, en al het

@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT provider_id AS \"provider_id!\" FROM email_messages\n            WHERE link_id = $1 AND provider_folder_id = $2 AND provider_id IS NOT NULL\n                AND NOT COALESCE((mailbox_state->>'provider_missing')::bool, false)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider_id!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "7d87979df827bac4718d7ee8822dd7189e7a0fb71f4de67a769923af5fa97f31"
+}
