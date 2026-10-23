@@ -46,7 +46,7 @@ Gmail-vormige poll-lus. Beoordeling per onderdeel:
 
 | Onderdeel | Oordeel |
 | --- | --- |
-| `imap_smtp_client` (`imap.rs`, `smtp.rs`, `tls.rs`; `async-imap`, `mail-send`, rustls) | **Overnemen** als basis van een `ota_imap`-adapter, maar herschrijven naar de nieuwe ports en uitbreiden met XOAUTH2, CONDSTORE/QRESYNC, IDLE, APPEND en MOVE. |
+| `imap_smtp_client` (`imap.rs`, `smtp.rs`, `tls.rs`; `async-imap`, `mail-send`, rustls) | **Overnemen** als basis van een `imap_client`-adapter, maar herschrijven naar de nieuwe ports en uitbreiden met XOAUTH2, CONDSTORE/QRESYNC, IDLE, APPEND en MOVE. |
 | `convert/imap.rs` (MIME via `mailparse` naar het servicemodel, plus tests) | **Overnemen**, omzetten naar `MailboxMessage`. De synthetische Gmail-labels vervallen: de nieuwe runtime werkt met `FolderRole` en `MailboxState`. |
 | Threading via `References`/`In-Reply-To` | **Overnemen als regel**: `provider_thread_id` = eerste Message-ID uit `References`, anders `In-Reply-To`, anders de eigen Message-ID. |
 | `email_utils::credential_crypto` (eigen AES-GCM met een statische sleutel) | **Niet overnemen.** De auth-service heeft al een envelope-cipher met KMS (CS-26: geen tweede cryptopad). Die wordt algemener gemaakt. |
@@ -100,7 +100,7 @@ ik uit de `LIST`-uitvoer.
 - Nieuwe enumwaarde `IMAP` in `email_user_provider_enum` en in de drie Rust
   `UserProvider`-enums (`crates/email`, `models_email` api en service), plus
   `graphql_email` en de gegenereerde frontendtypes.
-- Per link een rij in een nieuwe tabel `ota_imap_accounts`: host, poort,
+- Per link een rij in een nieuwe tabel `imap_accounts`: host, poort,
   SMTP-host, beveiliging, gebruikersnaam, auth-methode (`zoho_oauth` of
   `password`), datacenter, `zoho_account_id` (voor API-calls). Zoho is een
   voorinstelling die deze velden invult.
@@ -119,14 +119,14 @@ ik uit de `LIST`-uitvoer.
 
 - **Zoho OAuth** in de auth-service, naar het Microsoft-patroon: een
   server-client (geen Self-Client), PKCE, ondertekende state, en
-  refresh-tokens in een nieuwe tabel `ota_zoho_oauth_grants`, versleuteld
+  refresh-tokens in een nieuwe tabel `zoho_oauth_grants`, versleuteld
   met dezelfde envelope-cipher. Die cipher wordt generiek: het doel
   (`microsoft-refresh-token`, `zoho-refresh-token`, `imap-password`) gaat mee in
   de sleutelcontext en de AAD. De Microsoft-code verandert niet van gedrag.
 - **Lokale sleutelbron** (besloten: hosting op een eigen VPS, geen AWS): een
   tweede `DataKeyProvider` naast de KMS-variant. Die leidt per versleuteling
   een datasleutel af uit een hoofdsleutel van 32 bytes uit de configuratie
-  (`OTA_TOKEN_ENCRYPTION_KEY`, base64), via HKDF-SHA256 met een willekeurige
+  (`LOCAL_TOKEN_ENCRYPTION_KEY`, base64), via HKDF-SHA256 met een willekeurige
   salt en de sleutelcontext als `info`. De salt wordt bewaard op de plek waar
   KMS de versleutelde datasleutel bewaart; `kms_key_id` krijgt een vaste
   waarde zoals `local:v1`, zodat sleutelrotatie later mogelijk is. Welke bron
@@ -141,7 +141,9 @@ ik uit de `LIST`-uitvoer.
   (`get_zoho_access_token`, naast `get_microsoft_access_token`).
 - **Wachtwoord als terugval** voor generieke IMAP (en voor Zoho-SMTP als
   XOAUTH2 daar niet werkt): via dezelfde envelope-cipher opgeslagen, nooit
-  gelogd, nooit naar de frontend teruggestuurd.
+  gelogd, nooit naar de frontend teruggestuurd. Het schema
+  (`imap_accounts`) voorziet het al; de implementatie volgt na Zoho-OAuth,
+  omdat XOAUTH2 als werkend wordt aangenomen.
 - Terugval voor verzenden als SMTP-XOAUTH2 niet werkt: eerst de Zoho Mail
   API (`POST /accounts/{id}/messages`). Een app-wachtwoord gebruiken we alleen
   als de API om een andere reden niet kan. Ik kies op basis van jouw
@@ -195,7 +197,7 @@ verzonden kopie terug te vinden is, zoals bij Outlook.
 
 ### 3.5 Zoho Mail API (aanvulling, niet de sync)
 
-Een eigen crate `ota_zoho_client` met de datacenterkeuze, een token-provider
+Een eigen crate `zoho_client` met de datacenterkeuze, een token-provider
 via de auth-service en een rate-limiter (30 calls/minuut per account). In
 fase 1 gebruikt voor:
 
@@ -220,10 +222,10 @@ de compiler elke plek afdwingt.
 - In `AddInboxDialog`: een optie "Zoho Mail" (OAuth, met datacenterkeuze) en
   "Andere IMAP-server" (formulier met host, poort, beveiliging,
   gebruikersnaam en wachtwoord).
-- Code in `apps/web/src/features/ota/zoho-mail/`, ingeplugd in de
+- Code in `apps/web/src/features/zoho-mail/`, ingeplugd in de
   bestaande dialoog met zo weinig mogelijk regels in upstream-bestanden.
-- Achter een feature flag `ota_imap` (via `defineFlag`, als env-flag
-  `VITE_ENABLE_OTA_IMAP` omdat PostHog bij zelf hosten optioneel is).
+- Achter een feature flag `imap_client` (via `defineFlag`, als env-flag
+  `VITE_ENABLE_IMAP_MAILBOXES` omdat PostHog bij zelf hosten optioneel is).
 
 ### 3.8 MCP-tools
 
@@ -244,24 +246,24 @@ ik niet toe: koppelen vraagt een browser-OAuth en een geheim.
 
 | Fundament | Keuze |
 | --- | --- |
-| Naamgeving | Rust-crates `ota_*` (`ota_imap`, `ota_zoho_client`), tabellen `ota_*`, frontend `apps/web/src/features/ota/`, flags `ota_*`. |
-| Feature flag | Backend: config-schakelaars `OTA_IMAP_ENABLED` (workers en route), volgens de feature-flags-skill. Frontend: `ota_imap`. |
-| Zoho-connectie | Grant-custody in de auth-service (zelfde beveiligingsmodel als Microsoft); API-gebruik via `ota_zoho_client`. Een Zoho-grant hoort bij een gebruiker en een Zoho-account, niet bij één mailbox, zodat Calendar dezelfde grant met extra scopes kan gebruiken. |
+| Naamgeving | Gewone namen voor wat iets is (`imap_client`, `zoho_client`, `zoho_oauth_grants`, `imap_accounts`, `features/zoho-mail/`). Het prefix `ota` alleen voor fork-documentatie (`docs/ota/`) en branches (`ota/fase-N-...`). Nieuwe code staat zoveel mogelijk in eigen crates, modules en bestanden. |
+| Feature flag | Backend: config-schakelaar `IMAP_MAILBOXES_ENABLED` (workers en route), volgens de feature-flags-skill. Frontend: `VITE_ENABLE_IMAP_MAILBOXES`. |
+| Zoho-connectie | Grant-custody in de auth-service (zelfde beveiligingsmodel als Microsoft); API-gebruik via `zoho_client`. Een Zoho-grant hoort bij een gebruiker en een Zoho-account, niet bij één mailbox, zodat Calendar dezelfde grant met extra scopes kan gebruiken. |
 | Credential-opslag | De envelope-cipher van de auth-service wordt generiek per doel, met een lokale sleutelbron naast KMS; geen tweede crypto. |
-| Migraties | Bestandsnamen `<timestamp>_ota_<onderwerp>.sql`, alleen additief (nieuwe tabellen, `ADD VALUE` aan een enum). Upstream-migraties worden nooit aangepast. |
+| Migraties | Alleen additief (nieuwe tabellen, `ADD VALUE` aan een enum). Upstream-migraties worden nooit aangepast. |
 | Self-hosting | `docs/ota/self-hosting.md`, gestart in deze fase, voor een eigen VPS: Postgres, Redis, OpenSearch, LiveKit, FusionAuth, de lokale sleutel, S3- en SQS-vervangers, Zoho-client-ID/secret, AI-sleutels. |
 
 ## 5. Volgorde van werken (na akkoord)
 
-1. Migraties: enumwaarde, `ota_imap_accounts`, `ota_zoho_oauth_grants`.
+1. Migraties: enumwaarde, `imap_accounts`, `zoho_oauth_grants`.
 2. Generieke envelope-cipher met de lokale sleutelbron, en de
    Zoho-grant-flow in de auth-service, met tests.
-3. `ota_imap`: verbinding, XOAUTH2/LOGIN, `folders`, `changes`, `message`, met
+3. `imap_client`: verbinding, XOAUTH2/LOGIN, `folders`, `changes`, `message`, met
    tests tegen een lokale IMAP-server (GreenMail in Docker).
 4. IMAP-gateway en workers in `email_service`, provider-parameter in de
    claim-queries, `sqlx::test` voor de claims.
 5. Schrijfpad: commands, concepten, SMTP-verzending.
-6. `ota_zoho_client`: accounts, aliassen, handtekeningen, labels.
+6. `zoho_client`: accounts, aliassen, handtekeningen, labels.
 7. Route `POST /email/links/imap`, OpenAPI, SDK-coverage, frontenddialoog.
 8. IDLE-worker.
 9. Docs: `AGENTS.md` van de geraakte mappen, `docs/ota/self-hosting.md`, agent
@@ -272,14 +274,22 @@ draaien voor elke commit.
 
 ## 6. Open vragen voor jou
 
-1. **Aangenomen, nog te verifiëren.** CAPABILITY-uitvoer: we gaan uit van
-   CONDSTORE, QRESYNC, IDLE, MOVE, UIDPLUS, SPECIAL-USE en XOAUTH2 voor IMAP
-   en SMTP. Bericht-ID's gebruiken `map/UIDVALIDITY/UID`, zodat OBJECTID niet
-   nodig is.
+1. **Geverifieerd op `imap.zoho.eu` (23 oktober 2026).** Zoho meldt
+   `IMAP4rev1 UNSELECT CHILDREN XLIST NAMESPACE IDLE MOVE ID AUTH=PLAIN SASL-IR
+   AUTH=XOAUTH2 UIDPLUS ESEARCH LIST-EXTENDED LIST-STATUS WITHIN LITERAL- ACL
+   CONDSTORE`, voor en na het inloggen gelijk. Gevolgen:
+   - CONDSTORE, IDLE, MOVE, UIDPLUS en XOAUTH2 (IMAP) zijn er; het ontwerp
+     klopt.
+   - Geen QRESYNC (`ENABLE QRESYNC` antwoordt OK zonder `* ENABLED`):
+     verwijderingen komen uit de vergelijking van UID's, zoals gebouwd.
+   - Geen SPECIAL-USE, wel XLIST: maprollen komen uit de namenlijst; de echte
+     Zoho-mapnamen nog controleren met `LIST "" "*"`.
+   - Geen OBJECTID: bericht-ID's blijven `map/UIDVALIDITY/UID`.
+   - SMTP (`EHLO` op `smtp.zoho.eu:465`) nog niet getest.
 2. **Akkoord.** Merge-vriendelijkheid: een nieuwe provider raakt onvermijdelijk
    upstream-bestanden (enum, ~40 SQL-filters, workercompositie). Akkoord dat
    die aanpassingen klein en expliciet in upstream-bestanden komen, en al het
-   overige in `ota_*`?
+   overige in eigen crates en bestanden?
 3. **Akkoord.** Threading: threads op `References` in plaats van Zoho's
    `threadId`? De API-limiet maakt `threadId` per bericht onhaalbaar.
 4. ~~KMS bij zelf hosten~~ **Besloten**: eigen VPS, dus een lokale

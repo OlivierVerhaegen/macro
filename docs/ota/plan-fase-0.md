@@ -27,7 +27,7 @@ Dat is bijna een self-hosted opstelling. Wat het nog geen productie maakt:
 | Development-CA en `localhost` | Geen geldig certificaat. | Caddy met Let's Encrypt op `macro.olivetrees-agency.be` (of het certificaat van Cloudflare bij een tunnel). |
 | Passwordless login "niet veilig om te publiceren" | De guide waarschuwt hier expliciet voor. | Uitzoeken waarom (open signup, FusionAuth-kickstart met testsleutels) en dichtzetten: eigen FusionAuth-API-sleutels, signup alleen voor Olivier's eigen adres (de bestaande signup-allowlist van de auth-service). |
 | Lambda-handlers | Draaien in AWS. | Nagaan hoe de lokale stack ze draait en dat overnemen als containers die luisteren op ElasticMQ of MinIO-notificaties. |
-| `stack down` wist alles | Gevaarlijk in productie. | Eigen compose-bestand en beheerscripts (`ota-stack up/update/backup`), los van `just stack`. |
+| `stack down` wist alles | Gevaarlijk in productie. | Eigen compose-bestand en beheerscripts (`selfhost up/update/backup`), los van `just stack`. |
 | Geen back-ups | — | Dagelijkse `pg_dump`, back-up van de MinIO-bucket en van de sync-state, naar een externe opslag (bijvoorbeeld Hetzner Storage Box), met een geteste restore. |
 | Durable Objects/KV/R2/D1 van de sync-worker | Lokaal geëmuleerd door `wrangler` in het `sync_state`-volume. | Uitzoeken of die emulatie stabiel genoeg is voor productie, of dat de sync-worker op Cloudflare zelf moet draaien (gratis tot een bepaald volume). Dit is het grootste onbekende punt. |
 
@@ -60,7 +60,7 @@ helemaal niets bij Cloudflare Tunnel), SSH met sleutel.
 1. Meten: de lokale stack een dag draaien, geheugen en CPU per container noteren.
 2. Inventaris: elke AWS-, Doppler- en Cloudflare-afhankelijkheid per service,
    vanuit `local_env.rs`, de compose-generator en `infra/stacks/`.
-3. Compose-bestand `infra/ota/compose.yml` met MinIO, ElasticMQ, DynamoDB Local,
+3. Compose-bestand `infra/selfhost/compose.yml` met MinIO, ElasticMQ, DynamoDB Local,
    Redpanda, Postgres, Redis, OpenSearch, FusionAuth en de services, plus
    Caddy met Let's Encrypt.
 4. De sync-worker beslissen (zelf hosten of Cloudflare).
@@ -69,7 +69,7 @@ helemaal niets bij Cloudflare Tunnel), SSH met sleutel.
 7. `docs/ota/self-hosting.md` met installatie, update en restore.
 
 Wijzigingen in upstream-code alleen waar een endpoint of sleutelbron niet
-configureerbaar is; de rest leeft in `infra/ota/` en `docs/ota/`.
+configureerbaar is; de rest leeft in `infra/selfhost/` en `docs/ota/`.
 
 ## 4. Beslist
 

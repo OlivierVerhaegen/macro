@@ -8,7 +8,7 @@ ALTER TYPE email_user_provider_enum ADD VALUE IF NOT EXISTS 'IMAP';
 -- One version per (owner, Zoho user) reconnect, like microsoft_oauth_grant_versions.
 -- A grant belongs to a Zoho user, not to one mailbox, so later Zoho services
 -- (calendar, contacts) extend its scopes instead of creating a second grant.
-CREATE TABLE ota_zoho_oauth_grants (
+CREATE TABLE zoho_oauth_grants (
     grant_id uuid PRIMARY KEY,
     fusionauth_user_id text NOT NULL CHECK (fusionauth_user_id <> ''),
     email_address text NOT NULL CHECK (email_address <> '' AND email_address = lower(email_address)),
@@ -34,7 +34,7 @@ CREATE TABLE ota_zoho_oauth_grants (
 
 -- Server-owned PKCE state for one Zoho consent round trip. The row is removed
 -- with its in_progress_user_link; grants it produced survive until collected.
-CREATE TABLE ota_zoho_link_attempts (
+CREATE TABLE zoho_link_attempts (
     id uuid PRIMARY KEY REFERENCES in_progress_user_link(id) ON DELETE CASCADE,
     data_center text NOT NULL CHECK (data_center IN ('com','eu','in','com.au','jp','ca','sa','com.cn')),
     redirect_uri text NOT NULL,
@@ -43,12 +43,12 @@ CREATE TABLE ota_zoho_link_attempts (
     expires_at timestamptz NOT NULL,
     claimed_at timestamptz,
     completed_at timestamptz,
-    grant_id uuid REFERENCES ota_zoho_oauth_grants(grant_id) ON DELETE SET NULL
+    grant_id uuid REFERENCES zoho_oauth_grants(grant_id) ON DELETE SET NULL
 );
 
 -- Server settings for every IMAP mailbox. Deleted with its link. A password is
 -- stored only for password authentication, as an envelope like OAuth grants.
-CREATE TABLE ota_imap_accounts (
+CREATE TABLE imap_accounts (
     link_id uuid PRIMARY KEY REFERENCES email_links(id) ON DELETE CASCADE,
     imap_host text NOT NULL CHECK (imap_host <> ''),
     imap_port integer NOT NULL CHECK (imap_port BETWEEN 1 AND 65535),
@@ -64,7 +64,7 @@ CREATE TABLE ota_imap_accounts (
     password_key_id text,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT ota_imap_accounts_password_envelope CHECK (
+    CONSTRAINT imap_accounts_password_envelope CHECK (
         (auth_method = 'password') = (
             password_ciphertext IS NOT NULL AND password_data_key IS NOT NULL
             AND password_nonce IS NOT NULL AND password_encryption_version IS NOT NULL
