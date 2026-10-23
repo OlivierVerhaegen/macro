@@ -14,6 +14,11 @@ struct TestServer {
     password: String,
 }
 
+/// The opt-in test server from the environment; the tests skip without one.
+#[expect(
+    clippy::disallowed_methods,
+    reason = "test-only opt-in settings, not service config"
+)]
 fn test_server() -> Option<TestServer> {
     let address = std::env::var("IMAP_TEST_SERVER").ok()?;
     let (host, port) = address.rsplit_once(':')?;

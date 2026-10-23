@@ -1,40 +1,8 @@
-use crate::outbound::email_api::GmailApi;
-use crate::pubsub::context::PubSubEventBroker;
 use crate::pubsub::scheduled::context::ScheduledContext;
 use crate::pubsub::scheduled::process;
 use crate::pubsub::worker_lifecycle::run_until_cancelled;
 use futures::StreamExt;
-use sqlx::PgPool;
 use tokio_util::sync::CancellationToken;
-
-/// method that ingests sqs messages and calls the process function for each
-pub async fn run_worker(
-    worker: sqs_worker::SQSWorker,
-    db: PgPool,
-    email_api: GmailApi,
-    imap: crate::outbound::imap_mailbox::ImapSending<crate::composition::ZohoTokens>,
-    attachment_bytes: std::sync::Arc<
-        dyn email::domain::attachment_access::AuthorizedAttachmentBytes,
-    >,
-    s3_client: s3_client::S3,
-    attachment_bucket: String,
-    macro_event_broker: PubSubEventBroker,
-) {
-    run_worker_with_cancellation(
-        ScheduledContext {
-            sqs_worker: worker,
-            db,
-            email_api,
-            imap,
-            attachment_bytes,
-            s3_client,
-            attachment_bucket,
-            macro_event_broker,
-        },
-        CancellationToken::new(),
-    )
-    .await;
-}
 
 /// Ingests SQS messages until cancellation is requested.
 ///
