@@ -2,6 +2,10 @@
 
 Status: voorstel, wacht op akkoord. Branch: `ota/fase-1-zoho-mail`.
 
+Fase 1 wordt ontwikkeld en getest op de lokale stack
+(`docs/development/running-locally.md`). Hosting op de VPS is
+[fase 0](plan-fase-0.md).
+
 ## 1. Verkenning
 
 ### Huidige structuur (upstream, oktober 2026)
