@@ -1,5 +1,8 @@
 import { useAddInboxFlow } from '@core/email-link';
-import { EmailProviderDialog } from '@core/email-link/ProviderDialog';
+import {
+  EmailProviderDialog,
+  type ProviderChoice,
+} from '@core/email-link/ProviderDialog';
 import { fetchEmailConnectionProviders } from '@queries/auth/outlook-link';
 import { createEffect, createSignal, onCleanup } from 'solid-js';
 
@@ -27,13 +30,17 @@ export function AddInboxDialog() {
   const addInbox = useAddInboxFlow();
   const [pending, setPending] = createSignal(false);
   const [outlookAvailable, setOutlookAvailable] = createSignal(false);
+  const [zohoAvailable, setZohoAvailable] = createSignal(false);
   createEffect(() => {
     if (!isOpen()) return;
     let current = true;
     setOutlookAvailable(false);
+    setZohoAvailable(false);
     void fetchEmailConnectionProviders()
       .then((providers) => {
-        if (current) setOutlookAvailable(providers.outlook);
+        if (!current) return;
+        setOutlookAvailable(providers.outlook);
+        setZohoAvailable(providers.zoho ?? false);
       })
       .catch(() => {});
     onCleanup(() => {
@@ -43,13 +50,13 @@ export function AddInboxDialog() {
 
   onCleanup(() => setIsOpen(false));
 
-  const handleConfirm = async (provider: 'GMAIL' | 'OUTLOOK') => {
+  const handleConfirm = async (choice: ProviderChoice) => {
     if (pending()) return;
     setPending(true);
     // On web this navigates away; on native iOS the OAuth completes in place
     // and resolves, so the dialog dismisses itself.
     try {
-      await addInbox({ provider });
+      await addInbox({ choice });
     } finally {
       setPending(false);
       setIsOpen(false);
@@ -63,6 +70,7 @@ export function AddInboxDialog() {
       onSelect={handleConfirm}
       disabled={pending()}
       outlookAvailable={outlookAvailable()}
+      zohoAvailable={zohoAvailable()}
     />
   );
 }

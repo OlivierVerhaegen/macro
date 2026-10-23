@@ -218,13 +218,16 @@ de compiler elke plek afdwingt.
 
 ### 3.7 Frontend
 
-- In `AddInboxDialog`: een optie "Zoho Mail" (OAuth, met datacenterkeuze) en
-  "Andere IMAP-server" (formulier met host, poort, beveiliging,
-  gebruikersnaam en wachtwoord).
-- Code in `apps/web/src/features/zoho-mail/`, ingeplugd in de
-  bestaande dialoog met zo weinig mogelijk regels in upstream-bestanden.
-- Achter een feature flag `imap_client` (via `defineFlag`, als env-flag
-  `VITE_ENABLE_IMAP_MAILBOXES` omdat PostHog bij zelf hosten optioneel is).
+- **Gebouwd.** De dialoog "Connect email" biedt "Zoho Mail" met een
+  datacenterkeuze (Europa voorgeselecteerd). Code in
+  `apps/web/src/lib/core/email-link/` (`zoho.ts`, de dialoog en de
+  koppelflow) en `src/lib/queries/auth/zoho-link.ts`.
+- In Instellingen → Email krijgt een Zoho-inbox het veld "App password for
+  sending" (`features/settings/SmtpPasswordForm.tsx`).
+- Geen aparte frontend-flag: de knop verschijnt alleen als de auth-service
+  Zoho geconfigureerd heeft (`zoho` in `/link/email/providers`), net zoals
+  Outlook. Zo is er één bron van waarheid.
+- "Andere IMAP-server" (host, poort, wachtwoord) volgt later.
 
 ### 3.8 MCP-tools
 
@@ -246,7 +249,7 @@ ik niet toe: koppelen vraagt een browser-OAuth en een geheim.
 | Fundament | Keuze |
 | --- | --- |
 | Naamgeving | Gewone namen voor wat iets is (`imap_client`, `zoho_client`, `zoho_oauth_grants`, `imap_accounts`, `features/zoho-mail/`). Het prefix `ota` alleen voor fork-documentatie (`docs/ota/`) en branches (`ota/fase-N-...`). Nieuwe code staat zoveel mogelijk in eigen crates, modules en bestanden. |
-| Feature flag | Backend: config-schakelaar `IMAP_MAILBOXES_ENABLED` (workers en route), volgens de feature-flags-skill. Frontend: `VITE_ENABLE_IMAP_MAILBOXES`. |
+| Feature flag | Backend: config-schakelaar `IMAP_MAILBOXES_ENABLED` (workers en route), volgens de feature-flags-skill. Frontend: geen eigen flag; de Zoho-optie volgt `zoho` uit `/link/email/providers`. |
 | Zoho-connectie | Grant-custody in de auth-service (zelfde beveiligingsmodel als Microsoft); API-gebruik via `zoho_client`. Een Zoho-grant hoort bij een gebruiker en een Zoho-account, niet bij één mailbox, zodat Calendar dezelfde grant met extra scopes kan gebruiken. |
 | Credential-opslag | De envelope-cipher van de auth-service wordt generiek per doel, met een lokale sleutelbron naast KMS; geen tweede crypto. |
 | Migraties | Alleen additief (nieuwe tabellen, `ADD VALUE` aan een enum). Upstream-migraties worden nooit aangepast. |

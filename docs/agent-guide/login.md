@@ -25,7 +25,7 @@ Production Google/SSO and inbox/calendar connections may return to either
 `https://macro.com` or `https://www.macro.com`. Verify connections from both hosts;
 the web inbox link flow returns to `/app/inbox-link-callback` on the originating host.
 
-On desktop, connecting a Gmail or Outlook account, reconnecting one, or enabling
+On desktop, connecting a Gmail, Outlook or Zoho Mail account, reconnecting one, or enabling
 calendar opens the selected provider's consent in the system browser. The app
 stays open; the callback is
 `macro:///inbox-link-callback?link_id=...`, which provisions the inbox using the

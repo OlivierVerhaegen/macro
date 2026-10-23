@@ -52,6 +52,7 @@ import {
   SettingsRow,
 } from './primitives';
 import { clearSignatureState } from './SignatureSection';
+import { SmtpPasswordForm } from './SmtpPasswordForm';
 
 /**
  * Gmail integration as a single Connected-accounts card: a header row with the
@@ -489,7 +490,9 @@ function InboxRow(props: {
           <span class="text-xs text-ink-muted">
             {props.link.provider === 'OUTLOOK'
               ? 'Outlook / Microsoft 365'
-              : 'Gmail'}
+              : props.link.provider === 'IMAP'
+                ? 'Zoho Mail'
+                : 'Gmail'}
           </span>
           <Show when={ENABLE_INBOX_SYNC_STATUS}>
             <Switch
@@ -616,6 +619,12 @@ function InboxRow(props: {
           </Tooltip>
         </div>
       </div>
+      <Show when={props.link.provider === 'IMAP' && props.isOwn}>
+        <SmtpPasswordForm
+          linkId={props.link.id}
+          emailAddress={props.link.email_address}
+        />
+      </Show>
       <InboxSettingsOperations linkId={props.link.id} />
     </div>
   );

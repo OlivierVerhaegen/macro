@@ -1084,7 +1084,7 @@ uploaded as a Macro document, shown as a pill while it uploads, and `Send email`
 stays disabled until every upload finishes. Macro-native documents written in the
 editor have no file and cannot be attached; the send reports which document
 could not be attached. Attachments together may total the sending inbox's limit
-(18 MB on Gmail, 25 MB on Outlook): a picked or dropped file that would pass it
+(18 MB on Gmail, 25 MB on Outlook, 14 MB on IMAP inboxes such as Zoho Mail): a picked or dropped file that would pass it
 opens the same confirmation as the email composer, offering to upload it to Macro and link it from the body as a public
 view-only document instead; Cancel adds nothing, and files that fit still
 attach. The sent and saved-draft rows read `with N attachments`, and the

@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   choose: vi.fn(),
   start: vi.fn(),
   startOutlook: vi.fn(),
+  startZoho: vi.fn(),
   authenticate: vi.fn(),
   provision: vi.fn(),
   refetch: vi.fn(),
@@ -46,6 +47,9 @@ vi.mock('@queries/auth', () => ({
 }));
 vi.mock('@queries/auth/outlook-link', () => ({
   useInitOutlookLink: () => ({ mutateAsync: mocks.startOutlook }),
+}));
+vi.mock('@queries/auth/zoho-link', () => ({
+  useInitZohoLink: () => ({ mutateAsync: mocks.startZoho }),
 }));
 vi.mock('@queries/auth/user-info', () => ({ invalidateUserInfo: vi.fn() }));
 vi.mock('@queries/email/link', () => ({
@@ -264,7 +268,7 @@ describe('native account linking', () => {
 });
 
 it('uses the provider selected from a generic connect entry point', async () => {
-  mocks.choose.mockResolvedValue('OUTLOOK');
+  mocks.choose.mockResolvedValue({ provider: 'OUTLOOK' });
   mocks.startOutlook.mockResolvedValue(
     ok({
       link_id: 'selected-outlook',
@@ -276,6 +280,34 @@ it('uses the provider selected from a generic connect entry point', async () => 
   expect(mocks.startOutlook).toHaveBeenCalledOnce();
   expect(mocks.provision).toHaveBeenCalledWith({
     linkId: 'selected-outlook',
+    forceShare: false,
+  });
+});
+it('connects Zoho Mail in the chosen data center without an account hint', async () => {
+  mocks.choose.mockResolvedValue({ provider: 'ZOHO', dataCenter: 'eu' });
+  mocks.startZoho.mockResolvedValue(
+    ok({
+      link_id: 'zoho-link',
+      authorization_url: 'https://accounts.zoho.eu/oauth/v2/auth',
+    })
+  );
+  await useAddInboxFlow()({
+    provider: 'IMAP',
+    reconnectLinkId: 'existing-zoho-link',
+    emailAddress: 'contact@example.be',
+  });
+  expect(mocks.start).not.toHaveBeenCalled();
+  expect(mocks.startOutlook).not.toHaveBeenCalled();
+  expect(mocks.startZoho).toHaveBeenCalledExactlyOnceWith({
+    originalUrl: 'macro://android-auth/test-attempt',
+    dataCenter: 'eu',
+    reconnectLinkId: 'existing-zoho-link',
+  });
+  expect(mocks.authenticate).toHaveBeenCalledWith(
+    'https://accounts.zoho.eu/oauth/v2/auth'
+  );
+  expect(mocks.provision).toHaveBeenCalledWith({
+    linkId: 'zoho-link',
     forceShare: false,
   });
 });

@@ -1,12 +1,15 @@
 import { useIsAuthenticated, useUserId } from '@core/context/user';
 import { fireAndForget } from '@core/util/fireAndForget';
-import { throwOnErr } from '@core/util/result';
+import { ThrownResultError, throwOnErr } from '@core/util/result';
 import { Telemetry } from '@macro-inc/observability';
 import { invalidateUserInfo } from '@queries/auth/user-info';
 import { invalidateCalendarViews } from '@queries/calendar/sync';
 import { queryClient } from '@queries/client';
 import { invalidateAllSoup } from '@queries/soup/normalized-cache';
-import { emailClient } from '@service-email/client';
+import {
+  emailClient,
+  SMTP_PASSWORD_REJECTED_CODE,
+} from '@service-email/client';
 import type { ListLinksResponse } from '@service-email/generated/schemas';
 import { useMutation, useQuery } from '@tanstack/solid-query';
 import { type Accessor, createMemo } from 'solid-js';
@@ -293,4 +296,23 @@ export function useRemoveInboxMutation(callbacks?: RemoveInboxCallbacks) {
       callbacks
     ),
   }));
+}
+
+/**
+ * Sets the SMTP app password of an IMAP inbox. A password the mail server
+ * refuses fails with `SMTP_PASSWORD_REJECTED`.
+ */
+export function useSetSmtpPasswordMutation() {
+  return useMutation(() => ({
+    mutationFn: (args: { linkId: string; password: string }) =>
+      throwOnErr(() => emailClient.setLinkSmtpPassword(args)),
+  }));
+}
+
+/** Whether a failed save was the mail server refusing the password. */
+export function isSmtpPasswordRejected(error: unknown): boolean {
+  return (
+    error instanceof ThrownResultError &&
+    error.errors.some((e) => e.code === SMTP_PASSWORD_REJECTED_CODE)
+  );
 }

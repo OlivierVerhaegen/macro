@@ -36,6 +36,7 @@ import type {
   InitGithubLinkResponse,
   InitGmailLinkResponse,
   InitOutlookLinkResponse,
+  InitZohoLinkResponse,
   MergeGithubPullRequestRequest,
   MergeGithubPullRequestResponse,
   PatchUserTutorialRequest,
@@ -1092,6 +1093,40 @@ export const authServiceClient = {
       InitOutlookLinkResponse,
       'PAYMENT_REQUIRED' | 'TOO_MANY_PENDING_LINKS'
     >(`${authHost}/link/outlook?${params}`, {
+      method: 'POST',
+      errorResponseHandler: async (response) => {
+        if (response.status === 402) {
+          return { code: 'PAYMENT_REQUIRED', message: 'Payment required' };
+        }
+        if (response.status === 429) {
+          return {
+            code: 'TOO_MANY_PENDING_LINKS',
+            message: 'Too many pending inbox connections',
+          };
+        }
+        return {
+          code: 'HTTP_ERROR',
+          message: `HTTP error! status: ${response.status}`,
+        };
+      },
+    });
+  },
+
+  /** Connect a Zoho Mail inbox in the given Zoho data center. */
+  async initZohoLink(
+    originalUrl: string,
+    options: { dataCenter: string; reconnectLinkId?: string }
+  ) {
+    const params = new URLSearchParams({
+      original_url: encodeURIComponent(originalUrl),
+      data_center: options.dataCenter,
+    });
+    if (options.reconnectLinkId)
+      params.set('reconnect_link_id', options.reconnectLinkId);
+    return fetchWithAuth<
+      InitZohoLinkResponse,
+      'PAYMENT_REQUIRED' | 'TOO_MANY_PENDING_LINKS'
+    >(`${authHost}/link/zoho?${params}`, {
       method: 'POST',
       errorResponseHandler: async (response) => {
         if (response.status === 402) {

@@ -134,6 +134,9 @@ function emailFetch<T extends ObjectLike = never>(
  */
 export const SHARED_INBOX_CONFLICT_CODE = 'SHARED_INBOX_CONFLICT' as const;
 
+/** Error code when the mail server refuses an IMAP inbox's SMTP password. */
+export const SMTP_PASSWORD_REJECTED_CODE = 'SMTP_PASSWORD_REJECTED' as const;
+
 /** Error code `init` returns (HTTP 400) when the inbox is already provisioned. */
 export const ALREADY_INITIALIZED_CODE = 'ALREADY_INITIALIZED' as const;
 
@@ -477,6 +480,31 @@ export const emailClient = {
         };
       },
     });
+  },
+
+  /**
+   * Sets the SMTP app password an IMAP inbox (Zoho Mail) sends with. The mail
+   * server must accept it before it is stored; a refusal is
+   * `SMTP_PASSWORD_REJECTED`.
+   */
+  async setLinkSmtpPassword(args: { linkId: string; password: string }) {
+    return fetchWithToken<EmptyResponse, typeof SMTP_PASSWORD_REJECTED_CODE>(
+      `${emailHost}/email/links/${encodeURIComponent(args.linkId)}/smtp_password`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ password: args.password }),
+        errorResponseHandler: async (response) =>
+          response.status === 422
+            ? {
+                code: SMTP_PASSWORD_REJECTED_CODE,
+                message: 'The mail server rejected this password',
+              }
+            : {
+                code: 'HTTP_ERROR',
+                message: `HTTP error! status: ${response.status}`,
+              },
+      }
+    );
   },
 
   async deleteLink(args: { linkId: string }) {

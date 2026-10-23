@@ -13,6 +13,7 @@ import { Telemetry } from '@macro-inc/observability';
 import { useInitGmailLink } from '@queries/auth';
 import { useInitOutlookLink } from '@queries/auth/outlook-link';
 import { invalidateUserInfo } from '@queries/auth/user-info';
+import { useInitZohoLink } from '@queries/auth/zoho-link';
 import { invalidateEmailLinks, useEmailLinksQuery } from '@queries/email/link';
 import { queryReadyGate } from '@queries/gate';
 import type { ConsentScopes } from '@service-auth/client';
@@ -29,8 +30,9 @@ import type {
 import type { UseQueryResult } from '@tanstack/solid-query';
 import { err, okAsync, ResultAsync } from 'neverthrow';
 import { createMemo, createSignal, getOwner } from 'solid-js';
+import { match } from 'ts-pattern';
 import { inboxAuthorizationUrl } from './consent';
-import { selectEmailProvider } from './ProviderDialog';
+import { type ProviderChoice, selectEmailProvider } from './ProviderDialog';
 import { rememberInboxLinkReturn } from './return-layout';
 import { requestShareInboxConfirmation } from './share-conflict';
 
@@ -250,6 +252,7 @@ export function useAddInboxFlow() {
   const owner = getOwner();
   const initGmailLink = useInitGmailLink();
   const initOutlookLink = useInitOutlookLink();
+  const initZohoLink = useInitZohoLink();
   const { query, initEmailLink } = useEmailLinks();
   const { showPaywall } = usePaywallState();
 
@@ -285,20 +288,39 @@ export function useAddInboxFlow() {
   const initialize = (
     originalUrl: string,
     scopes: ConsentScopes,
-    provider: 'GMAIL' | 'OUTLOOK',
+    choice: ProviderChoice,
     reconnectLinkId?: string
   ) =>
-    provider === 'OUTLOOK'
-      ? initOutlookLink.mutateAsync({
+    match(choice)
+      .with({ provider: 'OUTLOOK' }, () =>
+        initOutlookLink.mutateAsync({
           originalUrl,
           calendar: scopes !== 'gmail',
           reconnectLinkId,
         })
-      : initGmailLink.mutateAsync({ originalUrl, scopes, reconnectLinkId });
+      )
+      .with({ provider: 'ZOHO' }, ({ dataCenter }) =>
+        initZohoLink.mutateAsync({ originalUrl, dataCenter, reconnectLinkId })
+      )
+      .with({ provider: 'GMAIL' }, () =>
+        initGmailLink.mutateAsync({ originalUrl, scopes, reconnectLinkId })
+      )
+      .exhaustive();
+
+  // Zoho's consent screen takes no account hint.
+  const authorizationUrl = (
+    url: string,
+    choice: ProviderChoice,
+    emailAddress?: string
+  ) =>
+    inboxAuthorizationUrl(
+      url,
+      choice.provider === 'ZOHO' ? undefined : emailAddress
+    );
 
   const startNativeFlow = async (
     scopes: ConsentScopes,
-    provider: 'GMAIL' | 'OUTLOOK',
+    choice: ProviderChoice,
     reconnectLinkId?: string,
     emailAddress?: string
   ) => {
@@ -306,7 +328,7 @@ export function useAddInboxFlow() {
     const result = await initialize(
       session.callbackUrl,
       scopes,
-      provider,
+      choice,
       reconnectLinkId
     );
     if (result.isErr()) {
@@ -323,7 +345,7 @@ export function useAddInboxFlow() {
     }
 
     const auth = await session.authenticate(
-      inboxAuthorizationUrl(result.value.authorization_url, emailAddress)
+      authorizationUrl(result.value.authorization_url, choice, emailAddress)
     );
     if (!auth.success) {
       if (auth.error !== 'User canceled login') {
@@ -337,17 +359,24 @@ export function useAddInboxFlow() {
 
   return async (options?: {
     scopes?: ConsentScopes;
-    provider?: 'GMAIL' | 'OUTLOOK';
+    /** An IMAP inbox asks again, since its data center is not stored. */
+    provider?: 'GMAIL' | 'OUTLOOK' | 'IMAP';
+    /** A choice already made in a provider dialog. */
+    choice?: ProviderChoice;
     reconnectLinkId?: string;
     emailAddress?: string;
   }) => {
     const scopes = options?.scopes ?? 'gmail';
-    const provider = options?.provider ?? (await selectEmailProvider(owner));
-    if (!provider) return;
+    const choice: ProviderChoice | undefined =
+      options?.choice ??
+      (options?.provider === 'GMAIL' || options?.provider === 'OUTLOOK'
+        ? { provider: options.provider }
+        : await selectEmailProvider(owner));
+    if (!choice) return;
     if (isNativeMobilePlatform()) {
       await startNativeFlow(
         scopes,
-        provider,
+        choice,
         options?.reconnectLinkId,
         options?.emailAddress
       );
@@ -361,7 +390,7 @@ export function useAddInboxFlow() {
     const result = await initialize(
       callbackUrl,
       scopes,
-      provider,
+      choice,
       options?.reconnectLinkId
     );
     if (result.isOk()) {
@@ -370,14 +399,15 @@ export function useAddInboxFlow() {
       rememberInboxLinkReturn(result.value.link_id, {
         url: `${toBaseRelative(window.location.pathname)}${window.location.search}${window.location.hash}`,
       });
-      const authorizationUrl = inboxAuthorizationUrl(
+      const consentUrl = authorizationUrl(
         result.value.authorization_url,
+        choice,
         options?.emailAddress
       );
       if (desktop) {
         await Telemetry.span('email.link.open_browser', async (span) => {
           span.setAttr('email.link.id', result.value.link_id);
-          const opened = await openDesktopAuthSession(authorizationUrl);
+          const opened = await openDesktopAuthSession(consentUrl);
           if (!opened.success) {
             span.error('Unable to open account connection browser');
             toast.failure(
@@ -387,7 +417,7 @@ export function useAddInboxFlow() {
         });
         return;
       }
-      window.location.href = authorizationUrl;
+      window.location.href = consentUrl;
     } else if (isPaymentRequired(result.error)) {
       showPaywall(PaywallKey.MULTI_INBOX);
     } else if (isTooManyPendingLinks(result.error)) {

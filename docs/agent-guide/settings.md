@@ -76,6 +76,18 @@ With a composer open, save a changed signature or reply-signature preference and
 verify its preview updates. Once the account refresh completes, reopen a composer
 offline and confirm it uses the saved settings.
 
+### Zoho Mail inboxes
+
+Where the server has Zoho configured, **Connect email** also offers **Zoho Mail**
+next to a data-center picker (Europe preselected); it starts Zoho consent and
+returns through the same inbox callback. A Zoho inbox is labelled **Zoho Mail**
+in Accounts, and its owner sees **App password for sending** under it: Zoho's
+SMTP server takes no OAuth, so sending needs an app password from Zoho
+Accounts. **Save** checks it with Zoho first; a refused password shows
+"Zoho rejected this app password" and stays in the field, an accepted one
+clears it. Reconnecting a Zoho inbox opens the provider dialog again, since its
+data center is not stored.
+
 ### Notification permission prompt
 
 After onboarding, an eligible desktop app user sees **Enable Desktop

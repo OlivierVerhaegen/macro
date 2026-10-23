@@ -67,4 +67,14 @@ describe('partitionByAttachmentLimit', () => {
       partitionByAttachmentLimit([large], [], attachmentLimitBytes('OUTLOOK'))
     ).toEqual({ attachable: [large], oversized: [] });
   });
+
+  it('holds an IMAP inbox under its SMTP message size', () => {
+    const medium = fileOf(15 * MB, 'medium.pdf');
+    expect(
+      partitionByAttachmentLimit([medium], [], attachmentLimitBytes('IMAP'))
+    ).toEqual({ attachable: [], oversized: [medium] });
+    expect(
+      partitionByAttachmentLimit([medium], [], attachmentLimitBytes('GMAIL'))
+    ).toEqual({ attachable: [medium], oversized: [] });
+  });
 });
