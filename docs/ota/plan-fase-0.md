@@ -24,21 +24,36 @@ Dat is bijna een self-hosted opstelling. Wat het nog geen productie maakt:
 | Mailpit vangt alle mail op | Inlogcodes en uitnodigingen bereiken niemand. | FusionAuth en de notificatieservice versturen via echte SMTP (bijvoorbeeld een Zoho-verzendadres). SES-gebruik gaat naar SMTP of krijgt een SES-compatibele relay. |
 | Gestubde integraties | Google, Stripe, CloudFront werken niet. | Stripe en CloudFront uitgeschakeld laten; Google alleen als je het nodig hebt. |
 | Vaste testgeheimen | Iedereen kent ze. | Alle geheimen nieuw genereren, in één `.env`-bestand buiten de repo (of een secretbeheerder), met rechten 600. |
-| Development-CA en `localhost` | Geen geldig certificaat. | Caddy met Let's Encrypt op een eigen domein (bijvoorbeeld `macro.olivetrees-agency.be`). |
-| Passwordless login "niet veilig om te publiceren" | De guide waarschuwt hier expliciet voor. | Uitzoeken waarom (open signup, FusionAuth-kickstart met testsleutels) en dichtzetten: eigen FusionAuth-API-sleutels, signup-allowlist voor je eigen domein en klantdomeinen. |
+| Development-CA en `localhost` | Geen geldig certificaat. | Caddy met Let's Encrypt op `macro.olivetrees-agency.be` (of het certificaat van Cloudflare bij een tunnel). |
+| Passwordless login "niet veilig om te publiceren" | De guide waarschuwt hier expliciet voor. | Uitzoeken waarom (open signup, FusionAuth-kickstart met testsleutels) en dichtzetten: eigen FusionAuth-API-sleutels, signup alleen voor Olivier's eigen adres (de bestaande signup-allowlist van de auth-service). |
 | Lambda-handlers | Draaien in AWS. | Nagaan hoe de lokale stack ze draait en dat overnemen als containers die luisteren op ElasticMQ of MinIO-notificaties. |
 | `stack down` wist alles | Gevaarlijk in productie. | Eigen compose-bestand en beheerscripts (`ota-stack up/update/backup`), los van `just stack`. |
 | Geen back-ups | — | Dagelijkse `pg_dump`, back-up van de MinIO-bucket en van de sync-state, naar een externe opslag (bijvoorbeeld Hetzner Storage Box), met een geteste restore. |
 | Durable Objects/KV/R2/D1 van de sync-worker | Lokaal geëmuleerd door `wrangler` in het `sync_state`-volume. | Uitzoeken of die emulatie stabiel genoeg is voor productie, of dat de sync-worker op Cloudflare zelf moet draaien (gratis tot een bepaald volume). Dit is het grootste onbekende punt. |
 
-## 2. VPS
+## 2. Server
 
-- Indicatief: 8 vCPU, 32 GB RAM, 200 GB SSD. OpenSearch, Kafka en de Rust-services
-  samen zijn zwaar; 16 GB is waarschijnlijk te krap. Dit bevestig ik in fase 0
-  met een meting op de lokale stack (`docker stats`).
-- In de EU (bijvoorbeeld Hetzner Falkenstein of Helsinki), voor de AVG.
-- Docker en Compose; geen Kubernetes.
-- Firewall: alleen 80 en 443 open, SSH met sleutel.
+Besloten: domein `macro.olivetrees-agency.be`; voorlopig logt alleen Olivier in.
+Kandidaten: een OVH-VPS of een eigen Raspberry Pi.
+
+| | OVH-VPS | Raspberry Pi 5 |
+| --- | --- | --- |
+| Architectuur | x86_64 | arm64; de stack bouwt al voor `aarch64-unknown-linux-gnu`, en Postgres, OpenSearch, Redpanda, MinIO en FusionAuth hebben arm64-images. Te verifiëren: elk overige image en de sync-worker. |
+| Geheugen | Kies ≥ 24 GB | Max 16 GB. Drie JVM's (OpenSearch, FusionAuth, eventueel Kafka) plus ~30 Rust-services is krap; vermoedelijk enkel haalbaar met Redpanda in plaats van Kafka en een kleine OpenSearch-heap. |
+| Opslag | SSD/NVMe | Verplicht een NVMe- of USB-SSD; een SD-kaart overleeft de schrijflast van Postgres en Kafka niet. |
+| Bereikbaarheid | Vast IP, poort 80/443 | Thuis-IP: via Cloudflare Tunnel (`xtask_local` heeft al tunnelondersteuning, `cf_tunnel.rs`), zonder poorten open te zetten. |
+| Bouwen | Op de server of in CI | Niet op de Pi zelf (Rust-builds duren uren): cross-compilen naar arm64 op een andere machine en de binaries kopiëren. |
+| Beschikbaarheid | Datacenter, stroom en netwerk redundant | Thuisstroom en -internet; een storing betekent geen mailsync tot herstel. |
+| Locatie (AVG) | EU-datacenter (Gravelines, Straatsburg, Frankfurt) | Bij jou thuis |
+
+Voorstel: **OVH-VPS voor productie**. De Pi is geschikt als testomgeving of als
+back-upbestemming, maar met 16 GB en thuisinternet is hij de zwakke schakel
+voor een systeem dat je mail en documenten bevat. De eerste meting in stap 1
+van de werkwijze bevestigt of 16 GB überhaupt volstaat; is dat zo, dan blijft
+de Pi een optie.
+
+Algemeen: Docker en Compose, geen Kubernetes; alleen 80 en 443 open (of
+helemaal niets bij Cloudflare Tunnel), SSH met sleutel.
 
 ## 3. Werkwijze
 
@@ -56,9 +71,8 @@ Dat is bijna een self-hosted opstelling. Wat het nog geen productie maakt:
 Wijzigingen in upstream-code alleen waar een endpoint of sleutelbron niet
 configureerbaar is; de rest leeft in `infra/ota/` en `docs/ota/`.
 
-## 4. Open vragen
+## 4. Beslist
 
-1. Heb je al een VPS-aanbieder, of mag ik Hetzner voorstellen?
-2. Welk domein wil je gebruiken?
-3. Wie moet kunnen inloggen: alleen jij, of ook klanten (fase 5)? Dat bepaalt
-   de signup-regels.
+- Domein: `macro.olivetrees-agency.be`.
+- Gebruikers: alleen Olivier. Klanttoegang komt pas in fase 5.
+- Server: OVH-VPS of Raspberry Pi; keuze na de meting (sectie 2).
