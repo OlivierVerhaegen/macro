@@ -12,6 +12,7 @@ session that answers in the provider-neutral mailbox vocabulary of
 - `src/sync.rs`: folder streams (first enumeration newest first, then
   CONDSTORE `CHANGEDSINCE`), message and attachment fetches.
 - `src/convert.rs`: RFC 5322 to `MailboxMessage`, threading, MIME parts.
+- `src/idle.rs`: IDLE waits that report only message changes, not keepalives.
 
 ## Scope
 

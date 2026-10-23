@@ -112,6 +112,7 @@ pub struct ImapConnection {
     pub(crate) condstore: bool,
     pub(crate) move_supported: bool,
     pub(crate) uidplus: bool,
+    pub(crate) idle_supported: bool,
 }
 
 impl ImapConnection {
@@ -153,6 +154,7 @@ impl ImapConnection {
             condstore: capabilities.has_str("CONDSTORE"),
             move_supported: capabilities.has_str("MOVE"),
             uidplus: capabilities.has_str("UIDPLUS"),
+            idle_supported: capabilities.has_str("IDLE"),
             session,
         })
     }

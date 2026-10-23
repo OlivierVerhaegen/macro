@@ -5,7 +5,10 @@
 //! fresh user so runs do not interfere. Without them the tests are skipped.
 
 use email_api_client::domain::models::{FolderRole, StreamPosition};
-use imap_client::{ImapConnection, ImapCredentials, ImapMessageId, ImapServer, SystemFlag};
+use imap_client::{
+    IdleOutcome, ImapConnection, ImapCredentials, ImapMessageId, ImapServer, SystemFlag,
+};
+use std::time::Duration;
 use uuid::Uuid;
 use zeroize::Zeroizing;
 
@@ -264,6 +267,42 @@ async fn organization_follows_flags_and_archive_folders_are_created_once() {
             .is_none()
     );
     connection.delete(&archived).await.unwrap();
+}
+
+#[tokio::test]
+async fn idle_reports_a_new_message_and_times_out_quietly() {
+    let Some(test) = test_server() else { return };
+    let user = user();
+    let listener = connect(&test, &user).await;
+    assert!(listener.supports_idle());
+
+    let (listener, outcome) = listener
+        .idle("INBOX", Duration::from_millis(500))
+        .await
+        .unwrap();
+    assert_eq!(outcome, IdleOutcome::TimedOut);
+
+    let mut writer = connect(&test, &user).await;
+    let waiting = tokio::spawn(listener.idle("INBOX", Duration::from_secs(20)));
+    // IDLE is only active once the listener has selected and entered it; the
+    // append below is the signal it waits for, retried until it is seen.
+    let mut appended = 0;
+    while !waiting.is_finished() && appended < 20 {
+        writer
+            .append(
+                "INBOX",
+                &[],
+                &message(&format!("<idle-{appended}@example.com>"), None),
+            )
+            .await
+            .unwrap();
+        appended += 1;
+        tokio::time::sleep(Duration::from_millis(250)).await;
+    }
+    let (listener, outcome) = waiting.await.unwrap().unwrap();
+    assert_eq!(outcome, IdleOutcome::Changed);
+    listener.logout().await;
+    writer.logout().await;
 }
 
 #[tokio::test]

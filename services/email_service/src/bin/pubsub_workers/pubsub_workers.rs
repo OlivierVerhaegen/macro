@@ -342,6 +342,12 @@ async fn main() -> anyhow::Result<()> {
             ),
             worker_cancellation_token.clone(),
         ));
+        // IDLE on each inbox makes new mail sync without waiting for the poll.
+        worker_tracker.spawn(
+            imap_gateway
+                .clone()
+                .run_idle(worker_cancellation_token.clone()),
+        );
     }
     let email_api_backfill = compose_email_api(
         db_backfill.clone(),

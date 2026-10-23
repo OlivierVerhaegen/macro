@@ -12,6 +12,7 @@ mod connection;
 mod convert;
 mod error;
 mod folders;
+mod idle;
 mod message_id;
 mod position;
 mod sync;
@@ -19,6 +20,7 @@ mod write;
 
 pub use connection::{ImapConnection, ImapCredentials, ImapServer};
 pub use error::ImapError;
+pub use idle::IdleOutcome;
 pub use message_id::ImapMessageId;
 pub use sync::{FolderChanges, FolderUids};
 pub use write::SystemFlag;

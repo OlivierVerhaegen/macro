@@ -167,7 +167,7 @@ ik uit de `LIST`-uitvoer.
 - **Threading**: zie de regel in de tabel hierboven. Zoho's eigen `threadId`
   past daar niet in, omdat de API per bericht te traag is (30
   calls/minuut). Mijn voorstel is die stap te laten vallen; zie open vraag 3.
-- **IDLE**: een kleine worker met één IDLE-verbinding per actieve IMAP-link,
+- **IDLE (gebouwd)**: een kleine worker met één IDLE-verbinding per actieve IMAP-link,
   alleen op INBOX. Bij `EXISTS`, `EXPUNGE` of `FETCH` zet hij de
   inbox-stream op "due", net zoals een Graph-webhook dat doet. Andere mappen
   en gemiste events vangt de periodieke poll op.

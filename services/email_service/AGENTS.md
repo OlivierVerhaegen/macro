@@ -75,6 +75,9 @@ the gateway `/email` prefix.
   app password (`imap_mailbox/send.rs`; Zoho SMTP takes no OAuth), set through
   `PUT /email/links/{link_id}/smtp_password` and kept by the authentication
   service. The Sent copy found by Message-ID gives the message its ids.
+  `imap_mailbox/idle.rs` keeps one IDLE connection per active IMAP inbox (in
+  `pubsub_workers`) and marks its folder streams due on each change, as a
+  Graph notification does; the poll still covers other folders.
 - Header addresses that Gmail accepts can fail `MacroUserIdStr::try_from_email`.
   Skip the bad address with a WARN that omits it (the parse error echoes it)
   instead of failing the step; see `pubsub::util::build_contact_connections`.

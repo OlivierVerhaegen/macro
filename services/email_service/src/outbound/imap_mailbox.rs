@@ -19,6 +19,7 @@ use uuid::Uuid;
 use zeroize::Zeroizing;
 
 mod credentials;
+mod idle;
 mod send;
 pub mod smtp;
 pub use credentials::ZohoCredentialsClient;
