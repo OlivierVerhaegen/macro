@@ -265,9 +265,16 @@ pub async fn run() -> anyhow::Result<()> {
                     s3: s3_client.clone(),
                     bucket: config.attachment_bucket.to_string(),
                     gmail: email_api.clone(),
-                    outlook: crate::outbound::email_api::ProviderMailboxGateway(
-                        outlook_api.clone(),
-                    ),
+                    mailbox: crate::outbound::mailbox_attachments::ProviderMailboxAttachments {
+                        db: db.clone(),
+                        outlook: crate::outbound::email_api::ProviderMailboxGateway(
+                            outlook_api.clone(),
+                        ),
+                        imap: crate::composition::imap_gateway(
+                            db.clone(),
+                            auth_service_client.as_ref().clone(),
+                        ),
+                    },
                 },
                 s3: s3_client.clone(),
                 bucket: config.attachment_bucket.to_string(),
@@ -330,7 +337,14 @@ pub async fn run() -> anyhow::Result<()> {
                 s3: s3_client.clone(),
                 bucket: config.attachment_bucket.to_string(),
                 gmail: email_api.clone(),
-                outlook: crate::outbound::email_api::ProviderMailboxGateway(outlook_api),
+                mailbox: crate::outbound::mailbox_attachments::ProviderMailboxAttachments {
+                    db: db.clone(),
+                    outlook: crate::outbound::email_api::ProviderMailboxGateway(outlook_api),
+                    imap: crate::composition::imap_gateway(
+                        db.clone(),
+                        auth_service_client.as_ref().clone(),
+                    ),
+                },
             },
             files: crate::outbound::attachment_access::MailAttachmentFiles {
                 db: db.clone(),
@@ -361,12 +375,24 @@ pub async fn run() -> anyhow::Result<()> {
         }),
         mailbox_initializer: Arc::new(
             email::domain::mailbox::initialization::MailboxInitializationService::new(
-                crate::outbound::mailbox_init::PgMailboxInitialization(db.clone()),
+                crate::outbound::mailbox_init::PgMailboxInitialization::new(db.clone()),
                 crate::outbound::mailbox_init::MicrosoftGrantSource(
                     auth_service_client.as_ref().clone(),
                 ),
             )
             .with_connections_enabled(config.outlook_connections_enabled),
+        ),
+        imap_mailbox_initializer: Arc::new(
+            email::domain::mailbox::initialization::MailboxInitializationService::new(
+                crate::outbound::mailbox_init::PgMailboxInitialization::for_provider(
+                    db.clone(),
+                    email::domain::models::UserProvider::Imap,
+                ),
+                crate::outbound::mailbox_init::ZohoGrantSource(
+                    auth_service_client.as_ref().clone(),
+                ),
+            )
+            .with_connections_enabled(config.imap_mailboxes_enabled),
         ),
         invitation_snapshots: email::outbound::invitation_pg::InvitationPgRepository(db.clone()),
         // calendar_service's sync kill switch rejects RSVP writes itself.

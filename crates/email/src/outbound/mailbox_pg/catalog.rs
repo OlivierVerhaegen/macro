@@ -9,7 +9,7 @@ impl PgMailboxSync {
         let row = sqlx::query!(r#"
             WITH candidate AS (
                 SELECT s.id FROM email_sync_streams s JOIN email_links l ON l.id = s.link_id
-                WHERE l.is_sync_active AND l.provider = 'OUTLOOK' AND s.generation = l.sync_generation
+                WHERE l.is_sync_active AND l.provider::text = $2 AND s.generation = l.sync_generation
                     AND s.kind = 'folder_catalog' AND s.next_run_at <= now()
                     AND (s.lease_until IS NULL OR s.lease_until < now())
                 ORDER BY s.next_run_at, s.id LIMIT 1 FOR UPDATE OF s SKIP LOCKED
@@ -17,7 +17,7 @@ impl PgMailboxSync {
             UPDATE email_sync_streams s SET lease_id = $1, lease_until = now() + interval '3 minutes', lease_started_at = clock_timestamp(), fence = fence + 1
             FROM candidate c, email_links l WHERE s.id = c.id AND l.id = s.link_id
             RETURNING s.id,s.link_id,s.generation,l.grant_generation,s.fence
-        "#,lease_id).fetch_optional(&self.db).await.map_err(db_error)?;
+        "#,lease_id,self.provider.as_str()).fetch_optional(&self.db).await.map_err(db_error)?;
         Ok(row.map(|row| CatalogLease {
             id: row.id,
             mailbox: MailboxKey {

@@ -67,6 +67,11 @@ the gateway `/email` prefix.
   calendar refresh so unrelated invitation updates retain teammates' OOO rows.
 - Spawn `run_transfers` regardless of the Outlook flags. Gmail inbox moves
   finish there; with writes off it pauses only the Outlook retire step.
+- IMAP mailboxes (Zoho Mail) sync through `outbound/imap_mailbox.rs`
+  behind `IMAP_MAILBOXES_ENABLED`; server settings live in `imap_accounts`,
+  written when `/email/init` adopts a Zoho grant (`ZohoGrantSource`). Attachment
+  downloads for Outlook and IMAP go through `mailbox_attachments.rs`, which
+  routes by the link's provider. Sending from IMAP mailboxes is not built yet.
 - Header addresses that Gmail accepts can fail `MacroUserIdStr::try_from_email`.
   Skip the bad address with a WARN that omits it (the parse error echoes it)
   instead of failing the step; see `pubsub::util::build_contact_connections`.

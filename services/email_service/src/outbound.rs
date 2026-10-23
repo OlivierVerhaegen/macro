@@ -19,9 +19,11 @@ pub mod draft_attachment_storage;
 /// Authorized provider attachment downloads and document storage.
 pub mod attachment_access;
 pub mod contact_photos;
+pub mod imap_mailbox;
 pub mod inbox_catalog;
 pub mod inbox_health;
 pub mod inbox_lifecycle;
+pub mod mailbox_attachments;
 
 /// Forwarded-attachment persistence facts.
 pub mod forwarded_attachments;

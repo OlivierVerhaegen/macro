@@ -58,6 +58,8 @@ impl<R: InboxCatalogRepository> InboxCatalogService<R> {
                             .next()
                             .is_some_and(|scope| scope.eq_ignore_ascii_case("Calendars.ReadWrite"))
                     }),
+                    // IMAP mailboxes carry no calendar grant.
+                    UserProvider::Imap => false,
                 };
                 InboxCatalogEntry {
                     needs_calendar_permission: facts.calendar_disabled || !has_calendar,

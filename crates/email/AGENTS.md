@@ -64,6 +64,10 @@ tools — hexagonal, heavily feature-gated.
   domain service, never an outbound adapter directly from another crate.
 - Sender discovery authorizes the inbox first. Gmail aliases use the sender
   provider; Outlook exposes its verified primary address without a Gmail lookup.
+- The mailbox runtime serves Outlook and IMAP (Zoho Mail). `PgMailboxSync::new`
+  claims Outlook work; `PgMailboxSync::for_provider(db, UserProvider::Imap)`
+  claims IMAP work, so each provider's workers run with their own gateway.
+  Watches, contacts and mailbox settings stay Outlook-only.
 - Outlook organization commands only run in their link's current
   `sync_generation`. Anything that bumps it must rebind unfinished commands as
   `pending`, since claims skip `confirming` ones while those still block later

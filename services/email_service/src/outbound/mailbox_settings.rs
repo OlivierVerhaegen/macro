@@ -24,6 +24,7 @@ where
         match mailbox.provider {
             UserProvider::Gmail => self.gmail.list_labels(mailbox.key.link_id).await,
             UserProvider::Outlook => self.outlook.labels(access(mailbox)).await,
+            UserProvider::Imap => Err(imap_unsupported()),
         }
     }
     async fn create_label(
@@ -34,6 +35,7 @@ where
         match mailbox.provider {
             UserProvider::Gmail => self.gmail.create_label(mailbox.key.link_id, name).await,
             UserProvider::Outlook => self.outlook.create_label(access(mailbox), name).await,
+            UserProvider::Imap => Err(imap_unsupported()),
         }
     }
     async fn delete_label(
@@ -44,6 +46,7 @@ where
         match mailbox.provider {
             UserProvider::Gmail => self.gmail.delete_label(mailbox.key.link_id, name).await,
             UserProvider::Outlook => self.outlook.delete_label(access(mailbox), name).await,
+            UserProvider::Imap => Err(imap_unsupported()),
         }
     }
     async fn category_messages(
@@ -107,5 +110,13 @@ where
         } else {
             self.gmail.unblock_sender(mailbox.key.link_id, sender).await
         }
+    }
+}
+
+/// Label management for IMAP mailboxes needs the Zoho Mail API; until then
+/// the settings worker records a permanent failure instead of retrying.
+fn imap_unsupported() -> EmailApiError {
+    EmailApiError::Permanent {
+        message: "labels are not available for IMAP mailboxes yet".into(),
     }
 }

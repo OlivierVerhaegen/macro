@@ -75,46 +75,45 @@ impl InboxHealthRepository for PgInboxHealth {
     }
 }
 
-pub struct ProviderInboxHealth<T, B, C> {
+pub struct ProviderInboxHealth<T, I, B, C> {
     pub gmail: crate::outbound::email_api::GmailApi,
     pub outlook: T,
+    /// Zoho tokens for IMAP mailboxes.
+    pub imap: I,
     pub db: sqlx::PgPool,
     pub queue: sqs_client::SQS,
     pub broker: B,
     pub contacts: std::sync::Arc<C>,
 }
-impl<T: MailboxTokenSource, B: MacroEventBroker, C: ContactsIngress> InboxHealthGateway
-    for ProviderInboxHealth<T, B, C>
+impl<T: MailboxTokenSource, I: MailboxTokenSource, B: MacroEventBroker, C: ContactsIngress>
+    InboxHealthGateway for ProviderInboxHealth<T, I, B, C>
 {
     async fn acquire(
         &self,
         binding: &InboxHealthBinding,
         freshness: TokenFreshness,
     ) -> Result<AccessToken, EmailApiError> {
-        match binding.link.provider {
+        let access = MailboxAccess {
+            link_id: binding.link.id,
+            grant_generation: binding.grant_generation,
+            sync_generation: binding.sync_generation,
+        };
+        let token = match binding.link.provider {
             UserProvider::Gmail => {
-                self.gmail
+                return self
+                    .gmail
                     .get_access_token(binding.link.id, freshness)
-                    .await
+                    .await;
             }
-            UserProvider::Outlook => self
-                .outlook
-                .access_token(
-                    MailboxAccess {
-                        link_id: binding.link.id,
-                        grant_generation: binding.grant_generation,
-                        sync_generation: binding.sync_generation,
-                    },
-                    freshness,
-                )
-                .await
-                .map_err(|error| match error {
-                    TokenError::ReauthRequired => EmailApiError::AuthRequired,
-                    _ => EmailApiError::Transient {
-                        message: "Microsoft token health is temporarily unavailable".into(),
-                    },
-                }),
-        }
+            UserProvider::Outlook => self.outlook.access_token(access, freshness).await,
+            UserProvider::Imap => self.imap.access_token(access, freshness).await,
+        };
+        token.map_err(|error| match error {
+            TokenError::ReauthRequired => EmailApiError::AuthRequired,
+            _ => EmailApiError::Transient {
+                message: "mailbox token health is temporarily unavailable".into(),
+            },
+        })
     }
     async fn refresh_gmail(&self, link: &Link) -> Result<(), MailboxError> {
         // Preserve contact refresh when a permanent watch configuration error

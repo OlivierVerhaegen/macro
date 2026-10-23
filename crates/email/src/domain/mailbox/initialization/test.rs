@@ -27,6 +27,7 @@ fn fixtures() -> (
             email: "mailbox@example.com".into(),
             tenant_id: "tenant".into(),
             mailbox_id: "mailbox".into(),
+            imap_server: None,
         },
         InitializationSnapshot {
             entitlement: crate::domain::inbox_entitlement::InboxConnectionFacts {

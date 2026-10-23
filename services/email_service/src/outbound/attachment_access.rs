@@ -23,7 +23,8 @@ pub struct ProviderAttachmentBytes<A> {
     pub s3: s3_client::S3,
     pub bucket: String,
     pub gmail: GmailApi,
-    pub outlook: A,
+    /// Outlook and IMAP downloads, routed by the link's provider.
+    pub mailbox: A,
 }
 impl<A: MailboxAttachmentAccess> AttachmentBytes for ProviderAttachmentBytes<A> {
     async fn bytes(&self, record: &AttachmentReadRecord) -> Result<Vec<u8>, AttachmentError> {
@@ -57,8 +58,8 @@ impl<A: MailboxAttachmentAccess> AttachmentBytes for ProviderAttachmentBytes<A> 
                 .get_attachment(record.link.id, &record.message_provider_id, id)
                 .await
                 .map_err(provider_error),
-            UserProvider::Outlook => self
-                .outlook
+            UserProvider::Outlook | UserProvider::Imap => self
+                .mailbox
                 .download(record.mailbox, &record.message_provider_id, id)
                 .await
                 .map_err(|e| match e {

@@ -10,6 +10,10 @@ use model_entity::EntityType;
 use std::future::Future;
 use uuid::Uuid;
 
+/// Raw attachment bytes for an IMAP message: Zoho accepts 20 MB per message,
+/// and base64 encoding grows attachments by about a third.
+pub(crate) const IMAP_ATTACHMENT_LIMIT_BYTES: u32 = 14_000_000;
+
 #[cfg(test)]
 mod test;
 
@@ -85,6 +89,7 @@ pub fn validate_attachment_edit(
     let maximum = match facts.provider {
         UserProvider::Gmail => 18_000_000,
         UserProvider::Outlook => 150_000_000,
+        UserProvider::Imap => u64::from(IMAP_ATTACHMENT_LIMIT_BYTES),
     };
     if added_bytes > 0 && facts.total_bytes.saturating_add(added_bytes) > maximum {
         return Err(AttachmentError::Invalid(

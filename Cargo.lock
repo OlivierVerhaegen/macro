@@ -1793,6 +1793,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-imap"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f97b87216c9f0ccc63c516263169085fa34bba25633f6d96c6a9b9ca1fd5f70a"
+dependencies = [
+ "async-channel 2.5.0",
+ "async-compression",
+ "base64 0.23.1",
+ "bytes",
+ "chrono",
+ "futures-util",
+ "imap-proto",
+ "log",
+ "nom 8.0.0",
+ "pin-project",
+ "pin-utils",
+ "self_cell",
+ "stop-token",
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
 name = "async-io"
 version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2122,6 +2145,7 @@ dependencies = [
  "github",
  "github_pull_requests",
  "gtm_invite",
+ "hkdf 0.12.4",
  "hmac 0.12.1",
  "http-body-util",
  "initiative",
@@ -2199,6 +2223,7 @@ dependencies = [
  "wiremock",
  "workspace-hack",
  "zeroize",
+ "zoho_client",
 ]
 
 [[package]]
@@ -2214,6 +2239,7 @@ dependencies = [
  "tracing",
  "uuid",
  "workspace-hack",
+ "zoho_client",
 ]
 
 [[package]]
@@ -3108,6 +3134,12 @@ name = "base64"
 version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
+
+[[package]]
+name = "base64"
+version = "0.23.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
 
 [[package]]
 name = "base64-simd"
@@ -7296,6 +7328,7 @@ dependencies = [
  "google_token",
  "html-escape",
  "http-body-util",
+ "imap_client",
  "infer 0.19.0",
  "item_filters",
  "last_online_tracker",
@@ -7361,6 +7394,7 @@ dependencies = [
  "utoipa-swagger-ui",
  "uuid",
  "workspace-hack",
+ "zeroize",
 ]
 
 [[package]]
@@ -10365,6 +10399,40 @@ dependencies = [
  "utoipa",
  "utoipa-swagger-ui",
  "workspace-hack",
+]
+
+[[package]]
+name = "imap-proto"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ccf963d57074747b455398a1763d174da80bcaba6f51e3671a82252b531a68b"
+dependencies = [
+ "nom 8.0.0",
+]
+
+[[package]]
+name = "imap_client"
+version = "0.1.0"
+dependencies = [
+ "async-imap",
+ "base64 0.22.1",
+ "chrono",
+ "email_api_client",
+ "email_utils",
+ "futures",
+ "mailparse",
+ "models_email",
+ "rustls",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-rustls",
+ "tracing",
+ "uuid",
+ "webpki-roots 1.0.10",
+ "workspace-hack",
+ "zeroize",
 ]
 
 [[package]]
@@ -15434,7 +15502,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22505a5c94da8e3b7c2996394d1c933236c4d743e81a410bcca4e6989fc066a4"
 dependencies = [
  "bytes",
- "heck 0.4.1",
+ "heck 0.5.0",
  "itertools 0.12.1",
  "log",
  "multimap",
@@ -17395,6 +17463,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "self_cell"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ab42ca02749e120097e328d91d415325bdf43b1c72c4c8badf37375fe40a813"
+
+[[package]]
 name = "semver"
 version = "1.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -18868,6 +18942,18 @@ dependencies = [
  "tokio",
  "tracing",
  "workspace-hack",
+]
+
+[[package]]
+name = "stop-token"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af91f480ee899ab2d9f8435bfdfc14d08a5754bd9d3fef1f1a1c23336aad6c8b"
+dependencies = [
+ "async-channel 1.9.0",
+ "cfg-if",
+ "futures-core",
+ "pin-project-lite",
 ]
 
 [[package]]
@@ -22554,6 +22640,23 @@ name = "zmij"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b"
+
+[[package]]
+name = "zoho_client"
+version = "0.1.0"
+dependencies = [
+ "reqwest 0.13.4",
+ "serde",
+ "serde_json",
+ "strum 0.27.2",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "url",
+ "wiremock",
+ "workspace-hack",
+ "zeroize",
+]
 
 [[package]]
 name = "zopfli"

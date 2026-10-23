@@ -37,6 +37,18 @@ pub struct VerifiedMailboxGrant {
     pub email: String,
     pub tenant_id: String,
     pub mailbox_id: String,
+    /// Where an IMAP mailbox is reached; `None` for API providers.
+    pub imap_server: Option<ImapServerSettings>,
+}
+
+/// Server settings recorded with an IMAP mailbox when it is adopted.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImapServerSettings {
+    pub imap_host: String,
+    pub imap_port: u16,
+    pub smtp_host: String,
+    pub smtp_port: u16,
+    pub username: String,
 }
 
 #[derive(Debug, Clone)]

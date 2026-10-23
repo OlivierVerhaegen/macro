@@ -24,6 +24,7 @@ async fn authorized(
         },
         provider: match row.provider.as_str() {
             "OUTLOOK" => UserProvider::Outlook,
+            "IMAP" => UserProvider::Imap,
             "GMAIL" => UserProvider::Gmail,
             _ => return Err(MailboxError::Persistence),
         },
@@ -278,6 +279,7 @@ impl MailboxSettingsRepository for PgMailboxSync {
                     provider: match r.provider.as_str() {
                         "GMAIL" => UserProvider::Gmail,
                         "OUTLOOK" => UserProvider::Outlook,
+                        "IMAP" => UserProvider::Imap,
                         _ => return Err(MailboxError::Persistence),
                     },
                 },

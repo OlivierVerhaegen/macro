@@ -155,6 +155,8 @@ pub enum DbUserProvider {
     Gmail,
     /// Microsoft Outlook and Microsoft 365.
     Outlook,
+    /// IMAP mailboxes: Zoho Mail and other IMAP servers.
+    Imap,
 }
 
 #[derive(Debug, Clone)]

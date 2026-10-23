@@ -80,6 +80,7 @@ calendar_events = { path = "../../crates/calendar_events", features = ["google",
 ammonia = { workspace = true }
 anyhow = { workspace = true }
 authentication_service_client = { path = "../../crates/authentication_service_client" }
+imap_client = { path = "../../crates/imap_client" }
 macro_aws_config = { path = "../../crates/macro_aws_config", features = ["s3", "sqs"] }
 aws-sdk-s3 = { workspace = true }
 aws-sdk-secretsmanager = { workspace = true }
@@ -189,6 +190,7 @@ uuid = { workspace = true }
 macro_service_urls = { path = "../../crates/macro_service_urls" }
 workspace-hack = { version = "0.1", path = "../../crates/workspace-hack" }
 
+zeroize = { workspace = true }
 [dev-dependencies]
 macro_auth = { path = "../../crates/macro_auth", features = ["testing"] }
 macro_db_migrator = { path = "../../crates/macro_db_migrator" }

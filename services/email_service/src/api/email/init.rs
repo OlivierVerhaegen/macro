@@ -223,30 +223,13 @@ pub async fn handler(
                 .map_err(|_| InitError::BadRequest("invalid user identity".into()))?,
             force_share: query.force_share,
         };
-        if ctx
-            .mailbox_initializer
-            .recognizes(&request)
-            .await
-            .map_err(InitError::MailboxInitialization)?
+        if let Some(result) = initialize_mailbox(ctx.mailbox_initializer.as_ref(), &request).await {
+            return result;
+        }
+        if let Some(result) =
+            initialize_mailbox(ctx.imap_mailbox_initializer.as_ref(), &request).await
         {
-            let result = ctx.mailbox_initializer.initialize(request).await;
-            return match result {
-                Ok(link_id) => Ok(Json(InitResponse {
-                    link_id,
-                    backfill_job_id: None,
-                })
-                .into_response()),
-                Err(InitializationError::SharingConfirmation {
-                    link_id,
-                    email,
-                    owner_email,
-                }) => Err(InitError::SharedInboxConflict {
-                    email_address: email,
-                    existing_owner_email: owner_email,
-                    existing_link_id: link_id,
-                }),
-                Err(error) => Err(InitError::MailboxInitialization(error)),
-            };
+            return result;
         }
     }
     // Init runs on every authentication, so its expected no-op outcomes (400s)
@@ -271,6 +254,40 @@ pub async fn handler(
         cleanup_in_progress_link_on_failure(&db, link_id, &owner, e).await;
     }
     result
+}
+
+/// Adopt a verified OAuth grant when `service` recognizes the attempt;
+/// `None` leaves the attempt to another provider or the Gmail path.
+async fn initialize_mailbox<R, G>(
+    service: &email::domain::mailbox::initialization::MailboxInitializationService<R, G>,
+    request: &InitializeMailbox,
+) -> Option<Result<Response, InitError>>
+where
+    R: email::domain::mailbox::initialization::MailboxInitializationRepository,
+    G: email::domain::mailbox::initialization::CompletedMailboxGrantSource,
+{
+    match service.recognizes(request).await {
+        Ok(false) => return None,
+        Err(error) => return Some(Err(InitError::MailboxInitialization(error))),
+        Ok(true) => {}
+    }
+    Some(match service.initialize(request.clone()).await {
+        Ok(link_id) => Ok(Json(InitResponse {
+            link_id,
+            backfill_job_id: None,
+        })
+        .into_response()),
+        Err(InitializationError::SharingConfirmation {
+            link_id,
+            email,
+            owner_email,
+        }) => Err(InitError::SharedInboxConflict {
+            email_address: email,
+            existing_owner_email: owner_email,
+            existing_link_id: link_id,
+        }),
+        Err(error) => Err(InitError::MailboxInitialization(error)),
+    })
 }
 
 /// Whether a failed `/email/init` should delete its `in_progress_user_link` row. True for

@@ -105,7 +105,7 @@ impl DraftRepository for PgMailboxSync {
         let row = sqlx::query!(r#"
             WITH candidate AS (
                 SELECT d.message_id FROM email_mailbox_drafts d JOIN email_links l ON l.id = d.link_id
-                WHERE l.is_sync_active AND l.provider = 'OUTLOOK' AND l.sync_generation = d.generation
+                WHERE l.is_sync_active AND l.provider::text = $3 AND l.sync_generation = d.generation
                     AND (d.state IN ('pending','running') OR (d.state = 'synced' AND EXISTS (
                         SELECT 1 FROM email_scheduled_messages s WHERE s.message_id = d.message_id AND s.link_id = d.link_id
                             AND NOT s.sent AND NOT s.processing AND s.send_time <= now())))
@@ -119,7 +119,7 @@ impl DraftRepository for PgMailboxSync {
             FROM candidate c,email_links l WHERE c.message_id = d.message_id AND l.id = d.link_id
             RETURNING d.message_id,d.link_id,d.generation,l.grant_generation,d.revision,d.actor_id,d.desired_content,
                 d.provider_id,d.base_version,d.delete_requested,d.checkpoint
-        "#,lease_id,mode==DraftClaimMode::All).fetch_optional(&mut *tx).await.map_err(db_error)?;
+        "#,lease_id,mode==DraftClaimMode::All,self.provider.as_str()).fetch_optional(&mut *tx).await.map_err(db_error)?;
         tx.commit().await.map_err(db_error)?;
         row.map(|row| {
             Ok(DraftLease {

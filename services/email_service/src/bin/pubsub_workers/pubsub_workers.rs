@@ -317,6 +317,24 @@ async fn main() -> anyhow::Result<()> {
             worker_cancellation_token.clone(),
         ));
     }
+    // IMAP mailboxes (Zoho Mail) run the same stream runtime with their own
+    // claims, gateway and credential health.
+    let imap_repository = email::outbound::mailbox_pg::PgMailboxSync::for_provider(
+        db.clone(),
+        email::domain::models::UserProvider::Imap,
+    );
+    let imap_gateway =
+        email_service::composition::imap_gateway(db.clone(), auth_service_client.clone());
+    if config.imap_mailboxes_enabled {
+        worker_tracker.spawn(email_service::mailbox_sync_worker::run(
+            email::domain::mailbox::MailboxSyncService::new(
+                imap_repository.clone(),
+                imap_gateway.clone(),
+                imap_repository.clone(),
+            ),
+            worker_cancellation_token.clone(),
+        ));
+    }
     let email_api_backfill = compose_email_api(
         db_backfill.clone(),
         config.gmail_gcp_queue.to_string(),
@@ -471,9 +489,14 @@ async fn main() -> anyhow::Result<()> {
                     s3: s3_client.clone(),
                     bucket: config.attachment_bucket.to_string(),
                     gmail: email_api_live.clone(),
-                    outlook: email_service::outbound::email_api::ProviderMailboxGateway(
-                        outlook_api.clone(),
-                    ),
+                    mailbox:
+                        email_service::outbound::mailbox_attachments::ProviderMailboxAttachments {
+                            db: db.clone(),
+                            outlook: email_service::outbound::email_api::ProviderMailboxGateway(
+                                outlook_api.clone(),
+                            ),
+                            imap: imap_gateway.clone(),
+                        },
                 },
                 s3: s3_client.clone(),
                 bucket: config.attachment_bucket.to_string(),
@@ -507,9 +530,14 @@ async fn main() -> anyhow::Result<()> {
             mailbox_repository,
             email_service::outbound::mailbox_projection::MailboxEffects {
                 db: db.clone(),
-                attachments: email_service::outbound::email_api::ProviderMailboxGateway(
-                    outlook_api,
-                ),
+                attachments:
+                    email_service::outbound::mailbox_attachments::ProviderMailboxAttachments {
+                        db: db.clone(),
+                        outlook: email_service::outbound::email_api::ProviderMailboxGateway(
+                            outlook_api,
+                        ),
+                        imap: imap_gateway,
+                    },
                 invitations: email::outbound::invitation_pg::InvitationPgRepository(db.clone()),
                 broker: macro_event_broker.clone(),
                 notification: notification_ingress_service.clone(),

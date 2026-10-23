@@ -190,6 +190,9 @@ where
         let maximum = match plan.destination_provider {
             UserProvider::Gmail => 18_000_000,
             UserProvider::Outlook => 150_000_000,
+            UserProvider::Imap => {
+                i64::from(crate::domain::draft_attachments::IMAP_ATTACHMENT_LIMIT_BYTES)
+            }
         };
         let mut total = plan
             .uploads

@@ -35,10 +35,31 @@ pub fn inbox_lifecycle(
 }
 
 pub type MicrosoftTokens = MailboxCredentials<PgMailboxSync, MicrosoftCredentialsClient>;
+pub type ZohoTokens =
+    MailboxCredentials<PgMailboxSync, crate::outbound::imap_mailbox::ZohoCredentialsClient>;
+pub type ImapGateway = crate::outbound::imap_mailbox::ImapMailboxGateway<ZohoTokens>;
+
+/// IMAP mailboxes reach their server with Zoho tokens whose health is
+/// recorded under the IMAP runtime's own binding checks.
+pub fn imap_gateway(
+    db: sqlx::PgPool,
+    auth: authentication_service_client::AuthServiceClient,
+) -> ImapGateway {
+    let runtime =
+        PgMailboxSync::for_provider(db.clone(), email::domain::models::UserProvider::Imap);
+    crate::outbound::imap_mailbox::ImapMailboxGateway::new(
+        db,
+        ZohoTokens::new(
+            runtime,
+            crate::outbound::imap_mailbox::ZohoCredentialsClient(auth),
+        ),
+    )
+}
 pub type InboxHealth = InboxHealthService<
     PgInboxHealth,
     ProviderInboxHealth<
         MicrosoftTokens,
+        ZohoTokens,
         MacroEventBrokerService<KafkaEventPublisher, TaskTracker>,
         SqsContactsIngress<SqsContactsQueue>,
     >,
@@ -63,7 +84,11 @@ pub fn inbox_health(
             gmail,
             outlook: MicrosoftTokens::new(
                 PgMailboxSync::new(db.clone()),
-                MicrosoftCredentialsClient(auth),
+                MicrosoftCredentialsClient(auth.clone()),
+            ),
+            imap: ZohoTokens::new(
+                PgMailboxSync::for_provider(db.clone(), email::domain::models::UserProvider::Imap),
+                crate::outbound::imap_mailbox::ZohoCredentialsClient(auth),
             ),
             db,
             queue,

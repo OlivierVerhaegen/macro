@@ -31,6 +31,9 @@ pub struct Config {
     /// Pause new provider writes; send outcome reconciliation always continues.
     #[macro_config_default(false)]
     pub outlook_writes_enabled: bool,
+    /// Admit and sync IMAP mailboxes (Zoho Mail). Off until the auth service has a Zoho client.
+    #[macro_config_default(false)]
+    pub imap_mailboxes_enabled: bool,
     /// The connection URL for the macrodb instance this application should use.
     /// For deployed applications, this is a secret stored in AWS Secrets Manager.
     pub macro_db_url: MacroDbUrl,

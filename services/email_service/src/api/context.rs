@@ -18,7 +18,9 @@ use email::{
 
 use crate::config::Config;
 use crate::outbound::email_api::GmailApi;
-use crate::outbound::mailbox_init::{MicrosoftGrantSource, PgMailboxInitialization};
+use crate::outbound::mailbox_init::{
+    MicrosoftGrantSource, PgMailboxInitialization, ZohoGrantSource,
+};
 use crate::util::redis::RedisClient;
 use entity_access::{domain::service::EntityAccessServiceImpl, outbound::PgAccessRepository};
 use entity_access_management::domain::service::EntityAccessManagementServiceImpl;
@@ -55,6 +57,11 @@ pub(crate) type MailboxInitializer =
         PgMailboxInitialization,
         MicrosoftGrantSource,
     >;
+pub(crate) type ImapMailboxInitializer =
+    email::domain::mailbox::initialization::MailboxInitializationService<
+        PgMailboxInitialization,
+        ZohoGrantSource,
+    >;
 pub(crate) type EmailSvc = EmailServiceImpl<
     EmailPgRepo,
     FrecencyQueryServiceImpl<FrecencyPgStorage>,
@@ -86,10 +93,13 @@ pub(crate) type OutlookApi = email_api_client::domain::service::mailbox::Mailbox
 pub(crate) type AttachmentReadSvc = email::domain::attachment_access::AttachmentReadService<
     EmailPgRepo,
     crate::outbound::attachment_access::ProviderAttachmentBytes<
-        crate::outbound::email_api::ProviderMailboxGateway<
-            email_api_client::OutlookApiClientRepository,
-            MicrosoftTokens,
-            email_api_client::domain::ports::AlwaysAllowRateLimiter,
+        crate::outbound::mailbox_attachments::ProviderMailboxAttachments<
+            crate::outbound::email_api::ProviderMailboxGateway<
+                email_api_client::OutlookApiClientRepository,
+                MicrosoftTokens,
+                email_api_client::domain::ports::AlwaysAllowRateLimiter,
+            >,
+            crate::composition::ImapGateway,
         >,
     >,
     crate::outbound::attachment_access::MailAttachmentFiles,
@@ -131,6 +141,7 @@ pub(crate) struct ApiContext {
         >,
     >,
     pub mailbox_initializer: Arc<MailboxInitializer>,
+    pub imap_mailbox_initializer: Arc<ImapMailboxInitializer>,
     pub invitation_snapshots: email::outbound::invitation_pg::InvitationPgRepository,
     pub invitation_resolver: Arc<
         calendar_events::domain::invitations::CalendarInvitationResolver<

@@ -277,6 +277,8 @@ impl<R: MailboxSettingsRepository, G: MailboxSettingsGateway> MailboxSettingsSer
                 })
                 .map(|r| r.sender)
                 .collect(),
+            // IMAP has no server-side sender rules to read.
+            UserProvider::Imap => Vec::new(),
         };
         result.sort();
         result.dedup();

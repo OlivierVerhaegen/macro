@@ -191,7 +191,8 @@
       "crates/teams",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "agent_code_mode": [
       "crates/activity",
@@ -301,7 +302,8 @@
       "crates/teams",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "agent_egress": [
       "crates/activity",
@@ -435,7 +437,8 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/user_quota",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "agent_fold": [
       "crates/agent_runtime_protocol",
@@ -586,7 +589,8 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/user_quota",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "agent_harness_service": [
       "crates/activity",
@@ -781,6 +785,7 @@
       "crates/unfurl",
       "crates/user_quota",
       "crates/workspace-hack",
+      "crates/zoho_client",
       "services/agent_harness_service",
       "services/connection_gateway",
       "services/mcp_auth_proxy",
@@ -958,7 +963,8 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/user_quota",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "agent_preview": [
       "crates/agent",
@@ -1108,7 +1114,8 @@
       "crates/teams",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "agent_session_realtime": [
       "crates/activity",
@@ -1215,7 +1222,8 @@
       "crates/teams",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "agent_trigger": [
       "crates/activity",
@@ -1324,7 +1332,8 @@
       "crates/teams",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "agent_trigger_service": [
       "crates/activity",
@@ -1436,6 +1445,7 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/workspace-hack",
+      "crates/zoho_client",
       "services/agent_trigger_service"
     ],
     "ai_billing": [
@@ -1538,7 +1548,8 @@
       "crates/teams",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "ai_billing_cli": [
       "crates/activity",
@@ -1641,6 +1652,7 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/workspace-hack",
+      "crates/zoho_client",
       "tooling/ai_billing_cli"
     ],
     "ai_engine": [
@@ -1813,7 +1825,8 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/user_quota",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "ai_tools": [
       "crates/activity",
@@ -1980,7 +1993,8 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/user_quota",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "ai_toolset": [
       "crates/ai_toolset",
@@ -2113,7 +2127,8 @@
       "crates/teams",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "attachment": [
       "crates/attachment",
@@ -2282,6 +2297,7 @@
       "crates/unfurl",
       "crates/user_quota",
       "crates/workspace-hack",
+      "crates/zoho_client",
       "services/authentication_service"
     ],
     "authentication_service_client": [
@@ -2315,7 +2331,8 @@
       "crates/non_empty",
       "crates/prompt",
       "crates/remote_env_var",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "bot_id": [
       "crates/bot_id",
@@ -2538,7 +2555,8 @@
       "crates/teams",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "cal": [
       "crates/analytics_client",
@@ -2722,7 +2740,8 @@
       "crates/teams",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "calendar_service": [
       "crates/activity",
@@ -2831,6 +2850,7 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/workspace-hack",
+      "crates/zoho_client",
       "services/calendar_service"
     ],
     "call": [
@@ -3080,7 +3100,8 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/user_quota",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "channel_labels": [
       "crates/agent",
@@ -3367,7 +3388,8 @@
       "crates/teams",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "codex_connection": [
       "crates/activity",
@@ -3475,7 +3497,8 @@
       "crates/teams",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "codex_fold": [
       "crates/agent_runtime_protocol",
@@ -3622,7 +3645,8 @@
       "crates/user_quota",
       "crates/webhook",
       "crates/webhook_signature",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "cognition": [
       "crates/activity",
@@ -3726,7 +3750,8 @@
       "crates/teams",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "collab_surface": [
       "crates/activity",
@@ -4038,7 +4063,8 @@
       "crates/unfurl",
       "crates/user_quota",
       "crates/work_feed",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "connection": [
       "crates/agent",
@@ -4317,6 +4343,7 @@
       "crates/unfurl",
       "crates/user_quota",
       "crates/workspace-hack",
+      "crates/zoho_client",
       "services/convert_service"
     ],
     "cowlike": [
@@ -4510,7 +4537,8 @@
       "crates/teams",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "database_env_vars": [
       "crates/database_env_vars",
@@ -4776,7 +4804,8 @@
       "crates/teams",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "dataloss_prevention_handler": [
       "crates/macro_aws_config",
@@ -4957,6 +4986,7 @@
       "crates/unfurl",
       "crates/user_quota",
       "crates/workspace-hack",
+      "crates/zoho_client",
       "services/deleted_item_poller"
     ],
     "dictation": [
@@ -5194,6 +5224,7 @@
       "crates/webhook_signature",
       "crates/work_feed",
       "crates/workspace-hack",
+      "crates/zoho_client",
       "services/document_storage_service"
     ],
     "document_storage_service_client": [
@@ -5396,6 +5427,7 @@
       "crates/unfurl",
       "crates/user_quota",
       "crates/workspace-hack",
+      "crates/zoho_client",
       "services/document_upload_finalizer_handler"
     ],
     "documents": [
@@ -5522,7 +5554,8 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/user_quota",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "docx_engine": [
       "crates/docx_engine",
@@ -5635,6 +5668,7 @@
       "crates/unfurl",
       "crates/user_quota",
       "crates/workspace-hack",
+      "crates/zoho_client",
       "services/docx_unzip_handler"
     ],
     "dynamodb_client": [
@@ -5740,7 +5774,8 @@
       "crates/system_properties",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "email_api_client": [
       "crates/activity",
@@ -5963,6 +5998,7 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/workspace-hack",
+      "crates/zoho_client",
       "services/email_refresh_handler"
     ],
     "email_scheduled_handler": [
@@ -6061,6 +6097,7 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/workspace-hack",
+      "crates/zoho_client",
       "services/email_scheduled_handler"
     ],
     "email_service": [
@@ -6109,6 +6146,7 @@
       "crates/google_token",
       "crates/harness_id",
       "crates/harness_token",
+      "crates/imap_client",
       "crates/initiative",
       "crates/invite_email",
       "crates/ip_extractor",
@@ -6175,6 +6213,7 @@
       "crates/unfurl",
       "crates/user_quota",
       "crates/workspace-hack",
+      "crates/zoho_client",
       "services/email_service"
     ],
     "email_service_client": [
@@ -6269,7 +6308,8 @@
       "crates/system_properties",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "email_sfs_delete_handler": [
       "crates/activity",
@@ -6367,6 +6407,7 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/workspace-hack",
+      "crates/zoho_client",
       "services/email_sfs_delete_handler"
     ],
     "email_suppression_handler": [
@@ -6804,7 +6845,8 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/user_quota",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "frecency": [
       "crates/bot_id",
@@ -6964,7 +7006,8 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/user_quota",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "github_pull_requests": [
       "crates/agent",
@@ -7054,7 +7097,8 @@
       "crates/non_empty",
       "crates/prompt",
       "crates/remote_env_var",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "granola_sync": [
       "crates/activity",
@@ -7531,7 +7575,8 @@
       "crates/system_properties",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "graphql_entity_mutation": [
       "crates/activity",
@@ -7678,7 +7723,8 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/user_quota",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "graphql_favorite": [
       "crates/activity",
@@ -7826,7 +7872,8 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/user_quota",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "graphql_initiative": [
       "crates/activity",
@@ -7974,7 +8021,8 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/user_quota",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "graphql_notification": [
       "crates/ai_toolset",
@@ -8244,7 +8292,8 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/user_quota",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "graphql_soup": [
       "crates/activity",
@@ -8390,7 +8439,8 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/user_quota",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "graphql_soup_filter_input": [
       "crates/bot_id",
@@ -8566,7 +8616,8 @@
       "crates/unfurl",
       "crates/user_quota",
       "crates/work_feed",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "gtm_invite": [
       "crates/bot_id",
@@ -8766,6 +8817,85 @@
       "crates/workspace-hack",
       "services/image_proxy_service"
     ],
+    "imap_client": [
+      "crates/activity",
+      "crates/agent",
+      "crates/ai_toolset",
+      "crates/ai_usage",
+      "crates/attachment",
+      "crates/bot_id",
+      "crates/bot_token",
+      "crates/broadcast",
+      "crates/calendar_events",
+      "crates/call",
+      "crates/channel_sender",
+      "crates/channels",
+      "crates/connection",
+      "crates/connection_gateway_client",
+      "crates/connection_gateway_models",
+      "crates/contacts",
+      "crates/cowlike",
+      "crates/database_env_vars",
+      "crates/document_sub_type",
+      "crates/email_api_client",
+      "crates/email_utils",
+      "crates/entity_access",
+      "crates/entity_access_db_utils",
+      "crates/entity_mutation",
+      "crates/filter_ast",
+      "crates/frecency",
+      "crates/genai_telemetry",
+      "crates/gmail_client",
+      "crates/harness_id",
+      "crates/harness_token",
+      "crates/imap_client",
+      "crates/initiative",
+      "crates/invite_email",
+      "crates/ip_extractor",
+      "crates/item_filters",
+      "crates/kafka_util",
+      "crates/last_online_tracker",
+      "crates/macro_auth",
+      "crates/macro_authorization",
+      "crates/macro_aws_config",
+      "crates/macro_entrypoint",
+      "crates/macro_env",
+      "crates/macro_env_var",
+      "crates/macro_event_broker",
+      "crates/macro_event_topics",
+      "crates/macro_service_urls",
+      "crates/macro_tower_layers",
+      "crates/macro_user_id",
+      "crates/macro_uuid",
+      "crates/mention_utils",
+      "crates/messages",
+      "crates/model",
+      "crates/model-entity",
+      "crates/model-error-response",
+      "crates/model_file_type",
+      "crates/model_notifications",
+      "crates/model_owner",
+      "crates/model_user",
+      "crates/models_bulk_upload",
+      "crates/models_email",
+      "crates/models_entity_access_management",
+      "crates/models_pagination",
+      "crates/models_permissions",
+      "crates/models_properties",
+      "crates/models_sfs",
+      "crates/non_empty",
+      "crates/notification",
+      "crates/notification_state",
+      "crates/prompt",
+      "crates/properties",
+      "crates/rate_limit",
+      "crates/remote_env_var",
+      "crates/share_permission_db_utils",
+      "crates/sqs_worker",
+      "crates/static_file_service_client",
+      "crates/system_properties",
+      "crates/workspace-hack"
+    ],
     "import": [
       "crates/activity",
       "crates/agent",
@@ -8871,7 +9001,8 @@
       "crates/teams",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "initiative": [
       "crates/activity",
@@ -9169,7 +9300,8 @@
       "crates/teams",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "kafka_util": [
       "crates/kafka_util",
@@ -9877,7 +10009,8 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/user_quota",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "mention_utils": [
       "crates/bot_id",
@@ -10211,7 +10344,8 @@
       "crates/system_properties",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "models_search_cursor": [
       "crates/models_search_cursor",
@@ -10313,7 +10447,8 @@
       "crates/system_properties",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "models_team": [
       "crates/models_team",
@@ -10732,7 +10867,8 @@
       "crates/teams",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "opensearch_client": [
       "crates/models_opensearch",
@@ -10841,6 +10977,7 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/workspace-hack",
+      "crates/zoho_client",
       "services/organization_retention_handler"
     ],
     "organization_retention_trigger": [
@@ -10939,6 +11076,7 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/workspace-hack",
+      "crates/zoho_client",
       "services/organization_retention_trigger"
     ],
     "pipedream_mcp": [
@@ -11093,7 +11231,8 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/user_quota",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "prompt": [
       "crates/prompt",
@@ -11345,7 +11484,8 @@
       "crates/system_properties",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "remote_env_var": [
       "crates/macro_env",
@@ -11525,7 +11665,8 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/user_quota",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "search_processing_service": [
       "crates/activity",
@@ -11669,6 +11810,7 @@
       "crates/unfurl",
       "crates/user_quota",
       "crates/workspace-hack",
+      "crates/zoho_client",
       "services/search_processing_service"
     ],
     "search_service": [
@@ -11790,7 +11932,8 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/user_quota",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "search_service_client": [
       "crates/activity",
@@ -11890,7 +12033,8 @@
       "crates/system_properties",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "search_upload_handler": [
       "crates/agent",
@@ -12209,7 +12353,8 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/user_quota",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "slack_import_worker": [
       "crates/activity",
@@ -12321,6 +12466,7 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/workspace-hack",
+      "crates/zoho_client",
       "services/slack_import_worker"
     ],
     "slack_integration": [
@@ -12430,7 +12576,8 @@
       "crates/teams",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "sns_client": [
       "crates/sns_client",
@@ -12549,7 +12696,8 @@
       "crates/teams",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "soup-filter-cache-adapter": [
       "crates/activity",
@@ -12671,7 +12819,8 @@
       "crates/teams",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "soup-filter-projection": [
       "crates/activity",
@@ -12789,7 +12938,8 @@
       "crates/teams",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "soup_realtime": [
       "crates/activity",
@@ -12921,7 +13071,8 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/user_quota",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "sqs_client": [
       "crates/activity",
@@ -13017,7 +13168,8 @@
       "crates/system_properties",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "sqs_worker": [
       "crates/sqs_worker",
@@ -13332,7 +13484,8 @@
       "crates/teams",
       "crates/trigger_context",
       "crates/unfurl",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "trigger_context": [
       "crates/bot_id",
@@ -13457,6 +13610,7 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/workspace-hack",
+      "crates/zoho_client",
       "services/upload_extractor_lambda_handler"
     ],
     "upload_extractor_lambda_trigger": [
@@ -13556,6 +13710,7 @@
       "crates/trigger_context",
       "crates/unfurl",
       "crates/workspace-hack",
+      "crates/zoho_client",
       "services/upload_extractor_lambda_trigger"
     ],
     "user_api_key": [
@@ -13780,7 +13935,8 @@
       "crates/user_quota",
       "crates/webhook",
       "crates/webhook_signature",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "webhook_signature": [
       "crates/webhook_signature",
@@ -13923,7 +14079,8 @@
       "crates/unfurl",
       "crates/user_quota",
       "crates/work_feed",
-      "crates/workspace-hack"
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ],
     "worker-rs-otel": [
       "crates/worker-rs-otel"
@@ -13995,6 +14152,10 @@
     "xtask_workflows": [
       "tooling/xtask/crates/xtask_paths",
       "tooling/xtask/crates/xtask_workflows"
+    ],
+    "zoho_client": [
+      "crates/workspace-hack",
+      "crates/zoho_client"
     ]
   }
 }

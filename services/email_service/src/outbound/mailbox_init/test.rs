@@ -67,6 +67,7 @@ fn grant(owner: Uuid) -> VerifiedMailboxGrant {
         email: "mailbox@example.com".into(),
         tenant_id: "tenant".into(),
         mailbox_id: "mailbox".into(),
+        imap_server: None,
     }
 }
 
@@ -75,7 +76,7 @@ async fn initialization_is_atomic_idempotent_and_seeds_independent_provider_stre
     let actor = actor(&db, "owner@example.com").await;
     let request = attempt(&db, actor.clone()).await;
     let service = MailboxInitializationService::new(
-        PgMailboxInitialization(db.clone()),
+        PgMailboxInitialization::new(db.clone()),
         Grants(grant(actor.0)),
     );
     let link = service.initialize(request.clone()).await.unwrap();
@@ -126,7 +127,7 @@ async fn shared_promotion_keeps_one_inbox_and_both_scoped_access_edges(db: PgPoo
     let first = actor(&db, "first@example.com").await;
     let second = actor(&db, "second@example.com").await;
     let service = MailboxInitializationService::new(
-        PgMailboxInitialization(db.clone()),
+        PgMailboxInitialization::new(db.clone()),
         Grants(grant(first.0)),
     );
     let link = service
@@ -134,7 +135,7 @@ async fn shared_promotion_keeps_one_inbox_and_both_scoped_access_edges(db: PgPoo
         .await
         .unwrap();
     let service = MailboxInitializationService::new(
-        PgMailboxInitialization(db.clone()),
+        PgMailboxInitialization::new(db.clone()),
         Grants(grant(second.0)),
     );
     let mut request = attempt(&db, second.clone()).await;
@@ -179,7 +180,7 @@ async fn wrong_actor_and_changed_snapshot_cannot_consume_an_attempt(db: PgPool) 
     let other = actor(&db, "other@example.com").await;
     let mut request = attempt(&db, owner.clone()).await;
     let grants = grant(owner.0);
-    let repo = PgMailboxInitialization(db.clone());
+    let repo = PgMailboxInitialization::new(db.clone());
     let before = repo.inspect(&request, &grants).await.unwrap();
     request.actor = other.1;
     request.actor_fusion_id = other.0;
@@ -219,7 +220,7 @@ async fn mixed_provider_connection_limit_is_rechecked_without_blocking_reconnect
     let owner = actor(&db, "limit@example.com").await;
     let req = attempt(&db, owner.clone()).await;
     let service = MailboxInitializationService::new(
-        PgMailboxInitialization(db.clone()),
+        PgMailboxInitialization::new(db.clone()),
         Grants(grant(owner.0)),
     );
     let outlook = service.initialize(req.clone()).await.unwrap();
@@ -232,7 +233,7 @@ async fn mixed_provider_connection_limit_is_rechecked_without_blocking_reconnect
     third.email = "third@example.com".into();
     third.mailbox_id = "third".into();
     let service =
-        MailboxInitializationService::new(PgMailboxInitialization(db.clone()), Grants(third));
+        MailboxInitializationService::new(PgMailboxInitialization::new(db.clone()), Grants(third));
     assert!(matches!(
         service.initialize(req).await,
         Err(InitializationError::PaymentRequired)
@@ -308,7 +309,7 @@ async fn admission_pause_rejects_new_mailbox_but_preserves_reconnect(db: PgPool)
     let owner = actor(&db, "pause@example.com").await;
     let request = attempt(&db, owner.clone()).await;
     let service = MailboxInitializationService::new(
-        PgMailboxInitialization(db.clone()),
+        PgMailboxInitialization::new(db.clone()),
         Grants(grant(owner.0)),
     )
     .with_connections_enabled(false);
@@ -317,7 +318,7 @@ async fn admission_pause_rejects_new_mailbox_but_preserves_reconnect(db: PgPool)
         Err(InitializationError::Unavailable)
     ));
     let enabled = MailboxInitializationService::new(
-        PgMailboxInitialization(db.clone()),
+        PgMailboxInitialization::new(db.clone()),
         Grants(grant(owner.0)),
     );
     let link = enabled.initialize(request).await.unwrap();
@@ -339,7 +340,7 @@ async fn reconnect_resumes_organization_commands_under_the_new_grant(db: PgPool)
     };
     let owner = actor(&db, "resume@example.com").await;
     let link = MailboxInitializationService::new(
-        PgMailboxInitialization(db.clone()),
+        PgMailboxInitialization::new(db.clone()),
         Grants(grant(owner.0)),
     )
     .initialize(attempt(&db, owner.clone()).await)
@@ -416,10 +417,13 @@ async fn reconnect_resumes_organization_commands_under_the_new_grant(db: PgPool)
     .await
     .unwrap();
 
-    MailboxInitializationService::new(PgMailboxInitialization(db.clone()), Grants(grant(owner.0)))
-        .initialize(attempt(&db, owner.clone()).await)
-        .await
-        .unwrap();
+    MailboxInitializationService::new(
+        PgMailboxInitialization::new(db.clone()),
+        Grants(grant(owner.0)),
+    )
+    .initialize(attempt(&db, owner.clone()).await)
+    .await
+    .unwrap();
     let generation = sqlx::query_scalar!(
         "SELECT sync_generation FROM email_links WHERE id = $1",
         link
@@ -477,7 +481,7 @@ async fn concurrent_gmail_and_outlook_connections_share_one_remaining_free_slot(
     sqlx::query!("INSERT INTO email_links(id,macro_id,fusionauth_user_id,email_address,provider) VALUES($1,$2,$3,'first@gmail.example','GMAIL')",Uuid::new_v4(),owner.1.as_ref(),owner.0.to_string()).execute(&db).await.unwrap();
     let request = attempt(&db, owner.clone()).await;
     let service = MailboxInitializationService::new(
-        PgMailboxInitialization(db.clone()),
+        PgMailboxInitialization::new(db.clone()),
         Grants(grant(owner.0)),
     );
     let gmail = async {

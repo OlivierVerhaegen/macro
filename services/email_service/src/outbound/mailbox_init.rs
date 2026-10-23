@@ -37,12 +37,77 @@ impl CompletedMailboxGrantSource for MicrosoftGrantSource {
             email: grant.email,
             tenant_id: grant.tenant_id,
             mailbox_id: grant.mailbox_id,
+            imap_server: None,
         })
     }
 }
 
+/// Zoho grants adopted as IMAP mailboxes. The Zoho user is the tenant and
+/// the Zoho Mail account the mailbox, so a reconnect cannot adopt another one.
 #[derive(Clone)]
-pub struct PgMailboxInitialization(pub PgPool);
+pub struct ZohoGrantSource(pub AuthServiceClient);
+
+/// Zoho serves IMAP and SMTP over implicit TLS on the standard ports.
+const ZOHO_IMAP_PORT: u16 = 993;
+const ZOHO_SMTP_PORT: u16 = 465;
+
+impl CompletedMailboxGrantSource for ZohoGrantSource {
+    async fn completed_grant(
+        &self,
+        attempt: Uuid,
+        owner: Uuid,
+    ) -> Result<VerifiedMailboxGrant, InitializationError> {
+        let grant =
+            self.0
+                .completed_zoho_grant(attempt, owner)
+                .await
+                .map_err(|error| match error {
+                    AuthServiceClientError::Forbidden | AuthServiceClientError::Unauthorized => {
+                        InitializationError::InvalidAttempt
+                    }
+                    _ => InitializationError::Unavailable,
+                })?;
+        Ok(VerifiedMailboxGrant {
+            scopes: grant.scopes,
+            calendar_requested: false,
+            id: grant.grant_id,
+            generation: grant.generation,
+            owner: grant.owner,
+            imap_server: Some(ImapServerSettings {
+                imap_host: grant.data_center.imap_host(),
+                imap_port: ZOHO_IMAP_PORT,
+                smtp_host: grant.data_center.smtp_host(),
+                smtp_port: ZOHO_SMTP_PORT,
+                username: grant.email.clone(),
+            }),
+            email: grant.email,
+            tenant_id: grant.zuid,
+            mailbox_id: grant.account_id,
+        })
+    }
+}
+
+/// Adopts verified grants for one stream-synced provider (Outlook or IMAP).
+#[derive(Clone)]
+pub struct PgMailboxInitialization {
+    db: PgPool,
+    provider: email::domain::models::UserProvider,
+}
+
+impl PgMailboxInitialization {
+    /// Outlook mailbox adoption.
+    pub fn new(db: PgPool) -> Self {
+        Self::for_provider(db, email::domain::models::UserProvider::Outlook)
+    }
+
+    pub fn for_provider(db: PgPool, provider: email::domain::models::UserProvider) -> Self {
+        Self { db, provider }
+    }
+
+    fn is_outlook(&self) -> bool {
+        self.provider == email::domain::models::UserProvider::Outlook
+    }
+}
 
 /// Fence legacy Gmail initialization against concurrent connections of either provider.
 /// The email domain owns the limit; storage supplies fresh facts under the same
@@ -85,6 +150,7 @@ fn unavailable<E: std::fmt::Debug>(error: E) -> InitializationError {
 
 async fn snapshot(
     conn: &mut PgConnection,
+    provider: &str,
     request: &InitializeMailbox,
     grant: &VerifiedMailboxGrant,
 ) -> Result<InitializationSnapshot, InitializationError> {
@@ -93,11 +159,11 @@ async fn snapshot(
             l.provider_tenant_id,l.provider_mailbox_id,l.disconnect_requested_at,
             EXISTS(SELECT 1 FROM macro_user_links e WHERE e.link_id = l.id
                 AND e.primary_macro_id = $4 AND e.child_macro_id = l.macro_id) AS "actor_has_access!"
-        FROM email_links l WHERE l.provider = 'OUTLOOK'
+        FROM email_links l WHERE l.provider::text = $5
             AND ((l.provider_tenant_id = $1 AND l.provider_mailbox_id = $2) OR lower(l.email_address) = lower($3))
         ORDER BY (l.provider_tenant_id = $1 AND l.provider_mailbox_id = $2) DESC NULLS LAST,l.id
         LIMIT 1 FOR UPDATE OF l
-    "#,grant.tenant_id,grant.mailbox_id,grant.email,request.actor.as_ref())
+    "#,grant.tenant_id,grant.mailbox_id,grant.email,request.actor.as_ref(),provider)
         .fetch_optional(&mut *conn).await.map_err(unavailable)?;
     let existing = existing
         .map(|row| {
@@ -149,10 +215,11 @@ impl MailboxInitializationRepository for PgMailboxInitialization {
     async fn recognizes(&self, request: &InitializeMailbox) -> Result<bool, InitializationError> {
         sqlx::query_scalar!(r#"
             SELECT (EXISTS(SELECT 1 FROM in_progress_user_link WHERE id = $1
-                AND macro_user_id = $2 AND email_provider = 'OUTLOOK') OR
-                EXISTS(SELECT 1 FROM email_link_initializations WHERE attempt_id = $1 AND actor_id = $3)) AS "recognized!"
-        "#,request.attempt,request.actor_fusion_id,request.actor.as_ref())
-            .fetch_one(&self.0).await.map_err(unavailable)
+                AND macro_user_id = $2 AND email_provider::text = $4) OR
+                EXISTS(SELECT 1 FROM email_link_initializations i JOIN email_links l ON l.id = i.link_id
+                    WHERE i.attempt_id = $1 AND i.actor_id = $3 AND l.provider::text = $4)) AS "recognized!"
+        "#,request.attempt,request.actor_fusion_id,request.actor.as_ref(),self.provider.as_str())
+            .fetch_one(&self.db).await.map_err(unavailable)
     }
     async fn completed(
         &self,
@@ -163,7 +230,7 @@ impl MailboxInitializationRepository for PgMailboxInitialization {
             WHERE r.attempt_id = $1 AND r.actor_id = $2 AND (l.macro_id = $2 OR EXISTS (
                 SELECT 1 FROM macro_user_links e WHERE e.link_id = l.id
                     AND e.primary_macro_id = $2 AND e.child_macro_id = l.macro_id))
-        "#,request.attempt,request.actor.as_ref()).fetch_optional(&self.0).await.map_err(unavailable)
+        "#,request.attempt,request.actor.as_ref()).fetch_optional(&self.db).await.map_err(unavailable)
     }
 
     async fn inspect(
@@ -172,7 +239,8 @@ impl MailboxInitializationRepository for PgMailboxInitialization {
         grant: &VerifiedMailboxGrant,
     ) -> Result<InitializationSnapshot, InitializationError> {
         snapshot(
-            &mut *self.0.acquire().await.map_err(unavailable)?,
+            &mut *self.db.acquire().await.map_err(unavailable)?,
+            self.provider.as_str(),
             request,
             grant,
         )
@@ -186,7 +254,7 @@ impl MailboxInitializationRepository for PgMailboxInitialization {
         expected: &InitializationSnapshot,
         decision: InitializationDecision,
     ) -> Result<Uuid, InitializationError> {
-        let mut tx = self.0.begin().await.map_err(unavailable)?;
+        let mut tx = self.db.begin().await.map_err(unavailable)?;
         sqlx::query!(
             "SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended($1,0))",
             format!("inbox-entitlement:{}", request.actor)
@@ -196,7 +264,12 @@ impl MailboxInitializationRepository for PgMailboxInitialization {
         .map_err(unavailable)?;
         // Serialize address collisions and identity-stable alias changes. Lock
         // identity first everywhere to keep concurrent reconnects deterministic.
-        let identity_lock = format!("outlook:{}:{}", grant.tenant_id, grant.mailbox_id);
+        let identity_lock = format!(
+            "{}:{}:{}",
+            if self.is_outlook() { "outlook" } else { "imap" },
+            grant.tenant_id,
+            grant.mailbox_id
+        );
         sqlx::query!(
             "SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended($1,0))",
             identity_lock
@@ -211,7 +284,7 @@ impl MailboxInitializationRepository for PgMailboxInitialization {
         .fetch_one(&mut *tx)
         .await
         .map_err(unavailable)?;
-        let current = snapshot(&mut tx, request, grant).await?;
+        let current = snapshot(&mut tx, self.provider.as_str(), request, grant).await?;
         if current.entitlement != expected.entitlement
             || current.existing != expected.existing
             || current.account_for_email != expected.account_for_email
@@ -221,12 +294,13 @@ impl MailboxInitializationRepository for PgMailboxInitialization {
         let consumed = sqlx::query!(
             r#"
             DELETE FROM in_progress_user_link WHERE id = $1 AND macro_user_id = $2
-                AND email_provider = 'OUTLOOK' AND linked_email = $3
+                AND email_provider::text = $4 AND linked_email = $3
                 AND created_at > now() - interval '24 hours'
         "#,
             request.attempt,
             request.actor_fusion_id,
-            grant.email
+            grant.email,
+            self.provider.as_str()
         )
         .execute(&mut *tx)
         .await
@@ -241,8 +315,8 @@ impl MailboxInitializationRepository for PgMailboxInitialization {
                 sqlx::query!(r#"
                     INSERT INTO email_links (id,macro_id,fusionauth_user_id,email_address,provider,
                         grant_id,grant_generation,provider_tenant_id,provider_mailbox_id,is_sync_active)
-                    VALUES ($1,$2,$3,$4,'OUTLOOK',$5,$6,$7,$8,true)
-                "#,id,owner.as_ref(),grant.owner.to_string(),grant.email,grant.id,grant.generation,grant.tenant_id,grant.mailbox_id)
+                    VALUES ($1,$2,$3,$4,$9::text::email_user_provider_enum,$5,$6,$7,$8,true)
+                "#,id,owner.as_ref(),grant.owner.to_string(),grant.email,grant.id,grant.generation,grant.tenant_id,grant.mailbox_id,self.provider.as_str())
                     .execute(&mut *tx).await.map_err(unavailable)?;
                 (id, owner, true)
             }
@@ -296,10 +370,23 @@ impl MailboxInitializationRepository for PgMailboxInitialization {
             VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT(link_id,actor_id) DO UPDATE SET fusionauth_user_id = EXCLUDED.fusionauth_user_id,
                 grant_id = EXCLUDED.grant_id,grant_generation = EXCLUDED.grant_generation,granted_scopes = EXCLUDED.granted_scopes,verified_at = now()"#,
             link_id,request.actor.as_ref(),grant.owner.to_string(),grant.id,grant.generation,&grant.scopes).execute(&mut *tx).await.map_err(unavailable)?;
-        sqlx::query!(r#"INSERT INTO email_link_microsoft_scopes(link_id,grant_generation,granted_scopes) VALUES ($1,$2,$3)
-            ON CONFLICT(link_id) DO UPDATE SET grant_generation = EXCLUDED.grant_generation,granted_scopes = EXCLUDED.granted_scopes,
-                calendar_disabled_at = CASE WHEN $4 THEN NULL ELSE email_link_microsoft_scopes.calendar_disabled_at END,updated_at = now()"#,
-            link_id,grant.generation,&grant.scopes,grant.calendar_requested).execute(&mut *tx).await.map_err(unavailable)?;
+        if self.is_outlook() {
+            sqlx::query!(r#"INSERT INTO email_link_microsoft_scopes(link_id,grant_generation,granted_scopes) VALUES ($1,$2,$3)
+                ON CONFLICT(link_id) DO UPDATE SET grant_generation = EXCLUDED.grant_generation,granted_scopes = EXCLUDED.granted_scopes,
+                    calendar_disabled_at = CASE WHEN $4 THEN NULL ELSE email_link_microsoft_scopes.calendar_disabled_at END,updated_at = now()"#,
+                link_id,grant.generation,&grant.scopes,grant.calendar_requested).execute(&mut *tx).await.map_err(unavailable)?;
+        }
+        if let Some(server) = &grant.imap_server {
+            sqlx::query!(r#"INSERT INTO imap_accounts(link_id,imap_host,imap_port,smtp_host,smtp_port,smtp_security,username,auth_method)
+                VALUES ($1,$2,$3,$4,$5,'tls',$6,'zoho_oauth')
+                ON CONFLICT(link_id) DO UPDATE SET imap_host = EXCLUDED.imap_host,imap_port = EXCLUDED.imap_port,
+                    smtp_host = EXCLUDED.smtp_host,smtp_port = EXCLUDED.smtp_port,smtp_security = EXCLUDED.smtp_security,
+                    username = EXCLUDED.username,auth_method = EXCLUDED.auth_method,password_ciphertext = NULL,
+                    password_data_key = NULL,password_nonce = NULL,password_encryption_version = NULL,
+                    password_key_id = NULL,updated_at = now()"#,
+                link_id,server.imap_host,i32::from(server.imap_port),server.smtp_host,i32::from(server.smtp_port),server.username)
+                .execute(&mut *tx).await.map_err(unavailable)?;
+        }
         if owner != request.actor {
             macro_db_client::macro_user_links::insert_edge(
                 &mut *tx,
@@ -345,15 +432,19 @@ impl MailboxInitializationRepository for PgMailboxInitialization {
             .execute(&mut *tx)
             .await
             .map_err(unavailable)?;
-            sqlx::query!("INSERT INTO email_mailbox_settings_work(id,link_id,kind,resource_key) VALUES($1,$2,'catalog','') ON CONFLICT(link_id,kind,resource_key) DO UPDATE SET next_run_at=now()", macro_uuid::generate_uuid_v7(), link_id)
-                .execute(&mut *tx).await.map_err(unavailable)?;
-            sqlx::query!("INSERT INTO email_mailbox_watch_work(link_id) VALUES($1) ON CONFLICT(link_id) DO UPDATE SET next_run_at=now(),revision=email_mailbox_watch_work.revision+1",link_id)
-                .execute(&mut *tx).await.map_err(unavailable)?;
-            for kind in ["contacts_catalog", "contacts_profile"] {
-                sqlx::query!(
-                    "INSERT INTO email_sync_streams(id,link_id,generation,kind,scope_id) VALUES ($1,$2,$3,$4,'address_book') ON CONFLICT DO NOTHING",
-                    macro_uuid::generate_uuid_v7(),link_id,link.sync_generation,kind
-                ).execute(&mut *tx).await.map_err(unavailable)?;
+            // Mail settings, change notifications and contacts are Microsoft Graph
+            // features; IMAP mailboxes poll folders instead.
+            if self.is_outlook() {
+                sqlx::query!("INSERT INTO email_mailbox_settings_work(id,link_id,kind,resource_key) VALUES($1,$2,'catalog','') ON CONFLICT(link_id,kind,resource_key) DO UPDATE SET next_run_at=now()", macro_uuid::generate_uuid_v7(), link_id)
+                    .execute(&mut *tx).await.map_err(unavailable)?;
+                sqlx::query!("INSERT INTO email_mailbox_watch_work(link_id) VALUES($1) ON CONFLICT(link_id) DO UPDATE SET next_run_at=now(),revision=email_mailbox_watch_work.revision+1",link_id)
+                    .execute(&mut *tx).await.map_err(unavailable)?;
+                for kind in ["contacts_catalog", "contacts_profile"] {
+                    sqlx::query!(
+                        "INSERT INTO email_sync_streams(id,link_id,generation,kind,scope_id) VALUES ($1,$2,$3,$4,'address_book') ON CONFLICT DO NOTHING",
+                        macro_uuid::generate_uuid_v7(),link_id,link.sync_generation,kind
+                    ).execute(&mut *tx).await.map_err(unavailable)?;
+                }
             }
             // Old leases cannot write into this generation. Organization commands
             // read provider state before every write, so the replacement grant
