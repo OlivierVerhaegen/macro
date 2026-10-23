@@ -50,6 +50,8 @@ pub(crate) enum LinkProvider {
     Github,
     /// Microsoft Outlook linking.
     Microsoft,
+    /// Zoho Mail linking (Olive Trees fork).
+    Zoho,
 }
 
 impl LinkProvider {
@@ -59,6 +61,7 @@ impl LinkProvider {
             Self::Google => "google",
             Self::Github => "github",
             Self::Microsoft => "microsoft",
+            Self::Zoho => "zoho",
         }
     }
 }

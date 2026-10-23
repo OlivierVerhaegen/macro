@@ -246,6 +246,34 @@ pub async fn run() -> anyhow::Result<()> {
             .with_connections_enabled(config.outlook_connections_enabled),
         ) as Arc<dyn MicrosoftAuth>
     });
+    let zoho_auth = config
+        .zoho_credentials()
+        .context("invalid Zoho OAuth configuration")?
+        .map(|credentials| -> anyhow::Result<_> {
+            use crate::{
+                domain::zoho::{ZOHO_TOKEN_PURPOSE, ZohoAuth, ZohoAuthService},
+                microsoft_token_cipher::local::LocalDataKeyProvider,
+                outbound::zoho::{PgZohoGrants, ZohoOAuthProvider},
+            };
+            // Self-hosted: Zoho envelopes take their data keys from a local master key.
+            let cipher = EnvelopeMicrosoftTokenCipher::new(LocalDataKeyProvider::from_base64(
+                &credentials.token_encryption_key,
+            )?)
+            .with_purpose(ZOHO_TOKEN_PURPOSE);
+            Ok(Arc::new(ZohoAuthService::new(
+                PgZohoGrants::new(db.clone()),
+                ZohoOAuthProvider::new(
+                    zoho_client::ZohoOAuthClient::new(zoho_client::ZohoClientCredentials::new(
+                        credentials.client_id,
+                        credentials.client_secret,
+                    ))?,
+                    zoho_client::ZohoMailClient::new()?,
+                    account_link_state_key.clone(),
+                ),
+                Arc::new(cipher),
+            )) as Arc<dyn ZohoAuth>)
+        })
+        .transpose()?;
 
     let document_storage_service_client = DocumentStorageServiceClient::new(
         config.service_internal_auth_key.to_string().clone(),
@@ -650,6 +678,7 @@ pub async fn run() -> anyhow::Result<()> {
 
     // Cleanup continues while new connections are disabled or OAuth is unconfigured.
     let grant_repository = crate::outbound::microsoft::PgMicrosoftGrants::new(db.clone());
+    let zoho_grant_repository = crate::outbound::zoho::PgZohoGrants::new(db.clone());
     let grant_cleanup = tokio::spawn(async move {
         let mut interval = tokio::time::interval(MICROSOFT_GRANT_CLEANUP_INTERVAL);
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -659,6 +688,11 @@ pub async fn run() -> anyhow::Result<()> {
                 crate::domain::microsoft::collect_expired_grants(&grant_repository).await
             {
                 tracing::error!(?error, "Microsoft grant expiry cleanup failed");
+            }
+            if let Err(error) =
+                crate::domain::zoho::collect_expired_grants(&zoho_grant_repository).await
+            {
+                tracing::error!(?error, "Zoho grant expiry cleanup failed");
             }
         }
     });
@@ -672,6 +706,7 @@ pub async fn run() -> anyhow::Result<()> {
             github_link_service: Arc::new(github_link_service_impl),
             auth_client: Arc::new(auth_client),
             microsoft_auth,
+            zoho_auth,
             cursor_api_key_cipher,
             codex_connection,
             macro_cache_client: Arc::new(macro_cache_client),

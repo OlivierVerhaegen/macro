@@ -15,6 +15,7 @@ mod github;
 mod google;
 mod login;
 mod microsoft;
+mod zoho;
 
 #[cfg(test)]
 mod test;
@@ -153,6 +154,7 @@ fn provider_query_value(provider: LinkProvider) -> &'static str {
         LinkProvider::Google => "gmail",
         LinkProvider::Github => "github",
         LinkProvider::Microsoft => "outlook",
+        LinkProvider::Zoho => "zoho",
     }
 }
 
@@ -487,6 +489,7 @@ pub(in crate::api) async fn handler(
             .map(|r| r.into_response())
             .map_err(|e| e.into_response()),
         "microsoft" => microsoft::handler(&ctx, code, &state).await,
+        "zoho" => zoho::handler(&ctx, code, &state).await,
         _ => Err(error_response(
             StatusCode::NOT_IMPLEMENTED,
             "oauth2 callback not implemented for this provider",

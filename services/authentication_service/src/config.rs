@@ -46,6 +46,12 @@ maybe_env_vars! {
     pub struct MicrosoftClientSecret;
     pub struct MicrosoftTenantId;
     pub struct MicrosoftTokenKmsKeyId;
+    /// Zoho API Console client of a server-based application (Olive Trees fork).
+    pub struct ZohoClientId;
+    pub struct ZohoClientSecret;
+    /// Base64 of 32 random bytes; derives the data keys of Zoho token envelopes
+    /// on self-hosted deployments without KMS. Losing it orphans every grant.
+    pub struct LocalTokenEncryptionKey;
     /// KMS key that encrypts users' Cursor API keys. Deliberately not the
     /// Microsoft one: sharing it would grant whatever decrypts Cursor keys
     /// access to the key protecting everyone's mailbox credentials.
@@ -144,6 +150,12 @@ pub struct Config {
     pub microsoft_tenant_id: MicrosoftTenantId,
     /// KMS key used to encrypt Microsoft refresh-token data keys.
     pub microsoft_token_kms_key_id: MicrosoftTokenKmsKeyId,
+    /// Zoho OAuth client ID; Zoho linking is off when unset.
+    pub zoho_client_id: ZohoClientId,
+    /// Zoho OAuth client secret.
+    pub zoho_client_secret: ZohoClientSecret,
+    /// Local master key for Zoho token envelopes.
+    pub local_token_encryption_key: LocalTokenEncryptionKey,
     /// KMS key used to encrypt users' Cursor API keys. Required in practice —
     /// read through [`Config::cursor_api_key_kms_key_id`], which refuses an
     /// absent or blank value at startup.
@@ -221,6 +233,13 @@ pub(crate) struct MicrosoftCredentials {
     pub(crate) client_secret: String,
     pub(crate) tenant_id: String,
     pub(crate) token_kms_key_id: String,
+}
+
+/// Complete Zoho OAuth configuration used to enable Zoho Mail linking.
+pub(crate) struct ZohoCredentials {
+    pub(crate) client_id: String,
+    pub(crate) client_secret: String,
+    pub(crate) token_encryption_key: String,
 }
 
 impl Config {
@@ -306,6 +325,15 @@ impl Config {
         )
     }
 
+    /// Resolves Zoho credentials, enforcing that all values are configured together.
+    pub(crate) fn zoho_credentials(&self) -> anyhow::Result<Option<ZohoCredentials>> {
+        resolve_zoho_credentials(
+            &self.zoho_client_id,
+            &self.zoho_client_secret,
+            &self.local_token_encryption_key,
+        )
+    }
+
     /// Resolves the signup policy for the configured environment.
     pub(crate) fn signup_policy(&self) -> anyhow::Result<SignupPolicy> {
         self.signup_policy_for_environment(self.environment)
@@ -360,6 +388,33 @@ fn resolve_microsoft_credentials(
         }
         _ => anyhow::bail!(
             "MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, and MICROSOFT_TENANT_ID must all be set to nonblank values or all be unset"
+        ),
+    }
+}
+
+fn resolve_zoho_credentials(
+    client_id: &ZohoClientId,
+    client_secret: &ZohoClientSecret,
+    token_encryption_key: &LocalTokenEncryptionKey,
+) -> anyhow::Result<Option<ZohoCredentials>> {
+    match (
+        nonblank_value(client_id.value()),
+        nonblank_value(client_secret.value()),
+        nonblank_value(token_encryption_key.value()),
+    ) {
+        (None, None, _) => Ok(None),
+        (Some(client_id), Some(client_secret), Some(token_encryption_key)) => {
+            Ok(Some(ZohoCredentials {
+                client_id: client_id.to_owned(),
+                client_secret: client_secret.to_owned(),
+                token_encryption_key: token_encryption_key.to_owned(),
+            }))
+        }
+        (Some(_), Some(_), None) => anyhow::bail!(
+            "LOCAL_TOKEN_ENCRYPTION_KEY must be set to a nonblank value when Zoho OAuth is enabled"
+        ),
+        _ => anyhow::bail!(
+            "ZOHO_CLIENT_ID and ZOHO_CLIENT_SECRET must both be set to nonblank values or both be unset"
         ),
     }
 }

@@ -145,6 +145,7 @@ non_empty = { path = "../../crates/non_empty" }
 notification = { path = "../../crates/notification" }
 onboarding = { path = "../../crates/onboarding" }
 hkdf = { workspace = true }
+zoho_client = { path = "../../crates/zoho_client" }
 rand = { workspace = true }
 rate_limit = { path = "../../crates/rate_limit" }
 redis = { workspace = true }

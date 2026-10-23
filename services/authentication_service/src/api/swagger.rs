@@ -38,6 +38,7 @@ use crate::api::link::create_in_progress_link::CreateInProgressLinkResponse;
 use crate::api::link::github::{GithubLinkStatusResponse, InitGithubLinkResponse};
 use crate::api::link::gmail::{GmailLinkStatusResponse, InitGmailLinkResponse};
 use crate::api::link::outlook::InitOutlookLinkResponse;
+use crate::api::link::zoho::InitZohoLinkResponse;
 use crate::api::merge::create_merge_request::CreateAccountMergeRequest;
 use crate::api::user::get_legacy_user_permissions::GetLegacyUserPermissionsResponse;
 use crate::api::user::get_user_link_exists::UserLinkResponse;
@@ -97,6 +98,7 @@ use model::user::{
                 link::gmail::init_gmail_link_handler,
                 link::gmail::check_gmail_link_status_handler,
                 link::outlook::init_outlook_link_handler,
+                link::zoho::init_zoho_link_handler,
                 link::outlook::email_connection_providers,
 
                 // Cursor API key (settings -> Connections). Fully qualified:
@@ -241,6 +243,7 @@ use model::user::{
                         InitGmailLinkResponse,
                         GmailLinkStatusResponse,
                         InitOutlookLinkResponse,
+                        InitZohoLinkResponse,
                         CursorApiKeyStatus,
                         PutCursorApiKeyRequest,
 

@@ -161,6 +161,8 @@ fn map_domain_error(error: MicrosoftAuthError) -> InitOutlookLinkError {
 pub struct EmailConnectionProviders {
     pub gmail: bool,
     pub outlook: bool,
+    /// Zoho Mail over IMAP (Olive Trees fork).
+    pub zoho: bool,
     /// Where a Microsoft 365 administrator approves Macro for their whole
     /// directory. Present when Outlook is configured and the request named an
     /// `original_url` for the administrator's browser to return to.
@@ -219,5 +221,6 @@ pub async fn email_connection_providers(
             .as_ref()
             .is_some_and(|service| service.new_connections_enabled()),
         outlook_admin_consent_url,
+        zoho: ctx.zoho_auth.is_some(),
     }))
 }

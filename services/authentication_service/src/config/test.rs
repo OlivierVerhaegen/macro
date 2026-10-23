@@ -458,3 +458,35 @@ fn cursor_kms_key_required_when_both_absent() {
     let error = resolve_cursor_api_key_kms_key_id(&configured, None).unwrap_err();
     assert!(error.to_string().contains("CURSOR_API_KEY_KMS_KEY_ID"));
 }
+
+fn resolve_zoho(
+    client_id: Option<&'static str>,
+    client_secret: Option<&'static str>,
+    token_encryption_key: Option<&'static str>,
+) -> anyhow::Result<Option<ZohoCredentials>> {
+    resolve_zoho_credentials(
+        &client_id.map_or_else(ZohoClientId::new_unset, ZohoClientId::new_testing),
+        &client_secret.map_or_else(ZohoClientSecret::new_unset, ZohoClientSecret::new_testing),
+        &token_encryption_key.map_or_else(
+            LocalTokenEncryptionKey::new_unset,
+            LocalTokenEncryptionKey::new_testing,
+        ),
+    )
+}
+
+#[test]
+fn zoho_linking_is_off_without_a_client() {
+    assert!(resolve_zoho(None, None, None).unwrap().is_none());
+    assert!(resolve_zoho(None, None, Some("key")).unwrap().is_none());
+}
+
+#[test]
+fn zoho_linking_requires_the_whole_client_and_an_encryption_key() {
+    assert!(resolve_zoho(Some("id"), None, Some("key")).is_err());
+    assert!(resolve_zoho(Some("id"), Some("secret"), None).is_err());
+    assert!(resolve_zoho(Some("id"), Some("secret"), Some(" ")).is_err());
+    let credentials = resolve_zoho(Some("id"), Some("secret"), Some("key"))
+        .unwrap()
+        .expect("complete configuration enables Zoho");
+    assert_eq!(credentials.client_id, "id");
+}

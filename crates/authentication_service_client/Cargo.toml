@@ -8,6 +8,7 @@ version = "0.1.0"
 anyhow = { workspace = true }
 chrono = { workspace = true }
 model = { path = "../model" }
+zoho_client = { path = "../zoho_client" }
 reqwest = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
