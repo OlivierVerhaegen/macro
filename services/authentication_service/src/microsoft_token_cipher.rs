@@ -13,16 +13,28 @@ const AES_GCM_NONCE_LENGTH: usize = 12;
 const AES_GCM_TAG_LENGTH: usize = 16;
 const ENCRYPTION_PURPOSE: &str = "microsoft-refresh-token";
 
+pub mod local;
+
 pub use crate::domain::microsoft::token::*;
 
 /// AES-256-GCM envelope cipher backed by an external data-key provider.
 pub struct EnvelopeMicrosoftTokenCipher<P> {
     data_key_provider: P,
+    purpose: &'static str,
 }
 
 impl<P> EnvelopeMicrosoftTokenCipher<P> {
     pub fn new(data_key_provider: P) -> Self {
-        Self { data_key_provider }
+        Self {
+            data_key_provider,
+            purpose: ENCRYPTION_PURPOSE,
+        }
+    }
+
+    /// Bind envelopes to another secret kind, so they never decrypt as Microsoft tokens.
+    pub fn with_purpose(mut self, purpose: &'static str) -> Self {
+        self.purpose = purpose;
+        self
     }
 }
 
@@ -37,7 +49,7 @@ where
         email_address: &str,
         refresh_token: MicrosoftRefreshToken,
     ) -> Result<EncryptedMicrosoftToken, MicrosoftTokenCipherError> {
-        let identity = EncryptionIdentity::new(fusionauth_user_id, email_address)?;
+        let identity = EncryptionIdentity::new(self.purpose, fusionauth_user_id, email_address)?;
         let data_key = self
             .data_key_provider
             .generate_data_key(identity.kms_encryption_context())
@@ -73,7 +85,7 @@ where
         envelope: &EncryptedMicrosoftToken,
     ) -> Result<MicrosoftRefreshToken, MicrosoftTokenCipherError> {
         validate_envelope(envelope)?;
-        let identity = EncryptionIdentity::new(fusionauth_user_id, email_address)?;
+        let identity = EncryptionIdentity::new(self.purpose, fusionauth_user_id, email_address)?;
         let plaintext_data_key = self
             .data_key_provider
             .decrypt_data_key(
@@ -208,12 +220,14 @@ impl DataKeyProvider for KmsDataKeyProvider {
 }
 
 struct EncryptionIdentity {
+    purpose: &'static str,
     fusionauth_user_id: String,
     email_address: String,
 }
 
 impl EncryptionIdentity {
     fn new(
+        purpose: &'static str,
         fusionauth_user_id: &str,
         email_address: &str,
     ) -> Result<Self, MicrosoftTokenCipherError> {
@@ -226,13 +240,14 @@ impl EncryptionIdentity {
         }
 
         Ok(Self {
+            purpose,
             fusionauth_user_id,
             email_address,
         })
     }
 
     fn aad(&self) -> Vec<u8> {
-        let mut aad = ENCRYPTION_PURPOSE.as_bytes().to_vec();
+        let mut aad = self.purpose.as_bytes().to_vec();
         append_length_prefixed(&mut aad, &ENCRYPTION_VERSION.to_be_bytes());
         append_length_prefixed(&mut aad, self.fusionauth_user_id.as_bytes());
         append_length_prefixed(&mut aad, self.email_address.as_bytes());
@@ -241,7 +256,7 @@ impl EncryptionIdentity {
 
     fn kms_encryption_context(&self) -> HashMap<String, String> {
         HashMap::from([
-            ("macro:purpose".to_owned(), ENCRYPTION_PURPOSE.to_owned()),
+            ("macro:purpose".to_owned(), self.purpose.to_owned()),
             (
                 "macro:encryption-version".to_owned(),
                 ENCRYPTION_VERSION.to_string(),

@@ -26,4 +26,7 @@ Authorization and permission checks in backend code.
   copied row won't decrypt. Hold the plaintext in a type that redacts `Debug`
   and zeroizes on drop, use it immediately (e.g. as a request header), and never
   log or cache it. Deleting the row doesn't revoke the secret upstream; say so
-  in any disconnect UI.
+  in any disconnect UI. Self-hosted deployments without KMS (Olive Trees fork)
+  use the same envelope with `LocalDataKeyProvider`
+  (`services/authentication_service/src/microsoft_token_cipher/local.rs`): data
+  keys are derived from one configured master key, never a second cipher.
