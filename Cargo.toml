@@ -105,6 +105,7 @@ members = [
   "crates/pipedream_mcp",
   "crates/granola_sync",
   "crates/onboarding",
+  "crates/imap_client",
   "crates/zoho_client",
   "crates/ai_engine",
   "crates/docx_engine",
@@ -205,6 +206,7 @@ async-openai = { version = "0.36.1", features = [
   "embedding",
 ] }
 async-stream = "0.3.6"
+async-imap = { version = "0.12.0", default-features = false, features = ["runtime-tokio"] }
 async-trait = "0.1.86"
 automod = "1"
 aws-config = { version = "1.8.16", features = ["behavior-version-latest"] }
