@@ -118,7 +118,16 @@ ik uit de `LIST`-uitvoer.
   refresh-tokens in een nieuwe tabel `ota_zoho_oauth_grants`, versleuteld
   met dezelfde envelope-cipher. Die cipher wordt generiek: het doel
   (`microsoft-refresh-token`, `zoho-refresh-token`, `imap-password`) gaat mee in
-  de KMS-context en de AAD. De Microsoft-code verandert niet van gedrag.
+  de sleutelcontext en de AAD. De Microsoft-code verandert niet van gedrag.
+- **Lokale sleutelbron** (besloten: hosting op een eigen VPS, geen AWS): een
+  tweede `DataKeyProvider` naast de KMS-variant. Die leidt per versleuteling
+  een datasleutel af uit een hoofdsleutel van 32 bytes uit de configuratie
+  (`OTA_TOKEN_ENCRYPTION_KEY`, base64), via HKDF-SHA256 met een willekeurige
+  salt en de sleutelcontext als `info`. De salt wordt bewaard op de plek waar
+  KMS de versleutelde datasleutel bewaart; `kms_key_id` krijgt een vaste
+  waarde zoals `local:v1`, zodat sleutelrotatie later mogelijk is. Welke bron
+  gebruikt wordt, volgt uit de configuratie. Ontbreekt de sleutel terwijl de
+  lokale bron gekozen is, dan stopt de service bij het opstarten.
 - Scopes in fase 1: `ZOHOMAIL.PROTOCOL.IMAP`, `ZOHOMAIL.PROTOCOL.SMTP` (als de
   test slaagt), `ZohoMail.accounts.READ`, `ZohoMail.messages.READ` en
   `ZohoMail.folders.READ`. Scopes zijn per grant opgeslagen en uitbreidbaar;
@@ -234,15 +243,15 @@ ik niet toe: koppelen vraagt een browser-OAuth en een geheim.
 | Naamgeving | Rust-crates `ota_*` (`ota_imap`, `ota_zoho_client`), tabellen `ota_*`, frontend `apps/web/src/features/ota/`, flags `ota_*`. |
 | Feature flag | Backend: config-schakelaars `OTA_IMAP_ENABLED` (workers en route), volgens de feature-flags-skill. Frontend: `ota_imap`. |
 | Zoho-connectie | Grant-custody in de auth-service (zelfde beveiligingsmodel als Microsoft); API-gebruik via `ota_zoho_client`. Een Zoho-grant hoort bij een gebruiker en een Zoho-account, niet bij één mailbox, zodat Calendar dezelfde grant met extra scopes kan gebruiken. |
-| Credential-opslag | De envelope-cipher van de auth-service wordt generiek per doel; geen tweede crypto. |
+| Credential-opslag | De envelope-cipher van de auth-service wordt generiek per doel, met een lokale sleutelbron naast KMS; geen tweede crypto. |
 | Migraties | Bestandsnamen `<timestamp>_ota_<onderwerp>.sql`, alleen additief (nieuwe tabellen, `ADD VALUE` aan een enum). Upstream-migraties worden nooit aangepast. |
-| Self-hosting | `docs/ota/self-hosting.md`, gestart in deze fase: Postgres, Redis, OpenSearch, LiveKit, FusionAuth, AWS KMS (of een vervanger, zie open vraag 4), SQS/LocalStack, Zoho-client-ID/secret, AI-sleutels. |
+| Self-hosting | `docs/ota/self-hosting.md`, gestart in deze fase, voor een eigen VPS: Postgres, Redis, OpenSearch, LiveKit, FusionAuth, de lokale sleutel, S3- en SQS-vervangers, Zoho-client-ID/secret, AI-sleutels. |
 
 ## 5. Volgorde van werken (na akkoord)
 
 1. Migraties: enumwaarde, `ota_imap_accounts`, `ota_zoho_oauth_grants`.
-2. Generieke envelope-cipher en de Zoho-grant-flow in de auth-service,
-   met tests.
+2. Generieke envelope-cipher met de lokale sleutelbron, en de
+   Zoho-grant-flow in de auth-service, met tests.
 3. `ota_imap`: verbinding, XOAUTH2/LOGIN, `folders`, `changes`, `message`, met
    tests tegen een lokale IMAP-server (GreenMail in Docker).
 4. IMAP-gateway en workers in `email_service`, provider-parameter in de
@@ -267,9 +276,8 @@ draaien voor elke commit.
    overige in `ota_*`?
 3. **Threading**: akkoord met threads op `References` in plaats van Zoho's
    `threadId`? De API-limiet maakt `threadId` per bericht onhaalbaar.
-4. **KMS bij zelf hosten**: de bestaande cipher gebruikt AWS KMS. Host je op
-   AWS, of moet er een lokale sleutelbron komen (een sleutel uit
-   config/Doppler) als alternatieve `DataKeyProvider`?
+4. ~~KMS bij zelf hosten~~ **Besloten**: eigen VPS, dus een lokale
+   sleutelbron (sectie 3.2).
 5. **UI-taal**: de web-app heeft geen i18n-laag; alle teksten zijn Engels.
    Voorstel: nieuwe teksten in het Engels, zodat ze passen bij de rest.
    Nederlands vraagt eerst een i18n-laag voor de hele app, en dat valt buiten
