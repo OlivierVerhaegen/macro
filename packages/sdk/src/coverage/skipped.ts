@@ -88,6 +88,7 @@ export const authExcluded = [
   'initGithubLink',
   'initGmailLink',
   'initOutlookLink',
+  'initZohoLink',
   'inviteToTeam',
   'joinTeam',
   'joinTeamByInviteLink',
@@ -222,6 +223,7 @@ export const emailExcluded = [
   'listBackfillGmail',
   'patchSettings',
   'resyncLink',
+  'setLinkSmtpPassword',
 ] as const satisfies readonly (keyof EmailSdk)[];
 
 export const emailBacklog = [] as const satisfies readonly (keyof EmailSdk)[];

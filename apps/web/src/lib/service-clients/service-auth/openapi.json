@@ -2250,6 +2250,115 @@
         }
       }
     },
+    "/link/zoho": {
+      "post": {
+        "tags": ["link::zoho"],
+        "summary": "Initiates a Zoho Mail account link for an authenticated user.",
+        "operationId": "init_zoho_link",
+        "parameters": [
+          {
+            "name": "data_center",
+            "in": "query",
+            "description": "The Zoho data center of the account: com, eu, in, com.au, jp, ca, sa or com.cn.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "original_url",
+            "in": "query",
+            "description": "**OPTIONAL**. The original URL to redirect to.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "reconnect_link_id",
+            "in": "query",
+            "description": "Existing accessible inbox being reconnected.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitZohoLinkResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/login/apple": {
       "post": {
         "tags": ["login::apple"],
@@ -5942,7 +6051,7 @@
       "EmailConnectionProviders": {
         "type": "object",
         "description": "Actual deployment availability for the provider selector.",
-        "required": ["gmail", "outlook"],
+        "required": ["gmail", "outlook", "zoho"],
         "properties": {
           "gmail": {
             "type": "boolean"
@@ -5953,6 +6062,10 @@
           "outlook_admin_consent_url": {
             "type": ["string", "null"],
             "description": "Where a Microsoft 365 administrator approves Macro for their whole\ndirectory. Present when Outlook is configured and the request named an\n`original_url` for the administrator's browser to return to."
+          },
+          "zoho": {
+            "type": "boolean",
+            "description": "Zoho Mail over IMAP (Olive Trees fork)."
           }
         }
       },
@@ -6810,6 +6923,22 @@
           "authorization_url": {
             "type": "string",
             "description": "The OAuth authorization URL to redirect the user to."
+          },
+          "link_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The link ID for tracking the OAuth flow."
+          }
+        }
+      },
+      "InitZohoLinkResponse": {
+        "type": "object",
+        "description": "Response returned when a Zoho Mail link is initiated.",
+        "required": ["authorization_url", "link_id"],
+        "properties": {
+          "authorization_url": {
+            "type": "string",
+            "description": "The Zoho consent URL to redirect the user to."
           },
           "link_id": {
             "type": "string",

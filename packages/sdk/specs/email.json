@@ -2355,6 +2355,80 @@
         }
       }
     },
+    "/email/links/{link_id}/smtp_password": {
+      "put": {
+        "tags": ["Links"],
+        "summary": "Sets the password an IMAP inbox sends with. The mail server must accept it\nfirst; it is then kept encrypted by the authentication service.",
+        "operationId": "set_link_smtp_password",
+        "parameters": [
+          {
+            "name": "link_id",
+            "in": "path",
+            "description": "Inbox link ID.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetSmtpPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/email/messages": {
       "post": {
         "tags": ["Messages"],
@@ -6739,6 +6813,16 @@
           }
         }
       },
+      "SetSmtpPasswordRequest": {
+        "type": "object",
+        "description": "The SMTP password of an IMAP inbox, such as a Zoho app password.\nSecret-bearing request intentionally does not implement Debug.",
+        "required": ["password"],
+        "properties": {
+          "password": {
+            "type": "string"
+          }
+        }
+      },
       "Settings": {
         "type": "object",
         "properties": {
@@ -7219,7 +7303,7 @@
       },
       "UserProvider": {
         "type": "string",
-        "enum": ["GMAIL", "OUTLOOK"]
+        "enum": ["GMAIL", "OUTLOOK", "IMAP"]
       },
       "Value": {},
       "ViewerCapabilities": {

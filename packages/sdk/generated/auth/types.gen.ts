@@ -440,6 +440,10 @@ export type EmailConnectionProviders = {
      * `original_url` for the administrator's browser to return to.
      */
     outlook_admin_consent_url?: string | null;
+    /**
+     * Zoho Mail over IMAP (Olive Trees fork).
+     */
+    zoho: boolean;
 };
 
 /**
@@ -1086,6 +1090,20 @@ export type InitGmailLinkResponse = {
 export type InitOutlookLinkResponse = {
     /**
      * The OAuth authorization URL to redirect the user to.
+     */
+    authorization_url: string;
+    /**
+     * The link ID for tracking the OAuth flow.
+     */
+    link_id: string;
+};
+
+/**
+ * Response returned when a Zoho Mail link is initiated.
+ */
+export type InitZohoLinkResponse = {
+    /**
+     * The Zoho consent URL to redirect the user to.
      */
     authorization_url: string;
     /**
@@ -2976,6 +2994,43 @@ export type InitOutlookLinkResponses = {
 };
 
 export type InitOutlookLinkResponse2 = InitOutlookLinkResponses[keyof InitOutlookLinkResponses];
+
+export type InitZohoLinkData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * The Zoho data center of the account: com, eu, in, com.au, jp, ca, sa or com.cn.
+         */
+        data_center: string;
+        /**
+         * **OPTIONAL**. The original URL to redirect to.
+         */
+        original_url?: string;
+        /**
+         * Existing accessible inbox being reconnected.
+         */
+        reconnect_link_id?: string;
+    };
+    url: '/link/zoho';
+};
+
+export type InitZohoLinkErrors = {
+    400: ErrorResponse;
+    401: ErrorResponse;
+    402: ErrorResponse;
+    404: ErrorResponse;
+    429: ErrorResponse;
+    500: ErrorResponse;
+};
+
+export type InitZohoLinkError = InitZohoLinkErrors[keyof InitZohoLinkErrors];
+
+export type InitZohoLinkResponses = {
+    200: InitZohoLinkResponse;
+};
+
+export type InitZohoLinkResponse2 = InitZohoLinkResponses[keyof InitZohoLinkResponses];
 
 export type AppleLoginData = {
     body: AppleLoginRequest;

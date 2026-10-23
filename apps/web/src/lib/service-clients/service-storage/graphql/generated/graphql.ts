@@ -1022,6 +1022,8 @@ export type GraphqlEmailLiteral =
 export type GraphqlEmailProvider =
   /** Google Gmail. */
   | 'GMAIL'
+  /** An IMAP mailbox: Zoho Mail or another IMAP server. */
+  | 'IMAP'
   /** Microsoft Outlook and Microsoft 365. */
   | 'OUTLOOK';
 

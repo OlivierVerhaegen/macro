@@ -363,6 +363,7 @@ export * from './resyncResponse';
 export * from './scheduledSendStatus';
 export * from './sendMessageRequest';
 export * from './sendMessageResponse';
+export * from './setSmtpPasswordRequest';
 export * from './settings';
 export * from './settingsSignature';
 export * from './settingsSignatureOnRepliesForwards';

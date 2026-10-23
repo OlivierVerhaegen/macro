@@ -138,6 +138,8 @@ export * from './initGmailLinkParams';
 export * from './initGmailLinkResponse';
 export * from './initOutlookLinkParams';
 export * from './initOutlookLinkResponse';
+export * from './initZohoLinkParams';
+export * from './initZohoLinkResponse';
 export * from './inviteEntry';
 export * from './inviteToTeamRequest';
 export * from './joinTeamByInviteLinkResponse';

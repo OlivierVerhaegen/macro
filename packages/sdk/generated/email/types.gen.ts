@@ -1651,6 +1651,14 @@ export type SendMessageResponse = {
     message: ApiDraftOutput;
 };
 
+/**
+ * The SMTP password of an IMAP inbox, such as a Zoho app password.
+ * Secret-bearing request intentionally does not implement Debug.
+ */
+export type SetSmtpPasswordRequest = {
+    password: string;
+};
+
 export type Settings = {
     /**
      * The user's email signature content (HTML). On a patch, omit or send
@@ -1884,7 +1892,7 @@ export type UpsertScheduledResponse = {
     send_time: string;
 };
 
-export type UserProvider = 'GMAIL' | 'OUTLOOK';
+export type UserProvider = 'GMAIL' | 'OUTLOOK' | 'IMAP';
 
 export type Value = unknown;
 
@@ -2848,6 +2856,33 @@ export type ResyncLinkResponses = {
 };
 
 export type ResyncLinkResponse = ResyncLinkResponses[keyof ResyncLinkResponses];
+
+export type SetLinkSmtpPasswordData = {
+    body: SetSmtpPasswordRequest;
+    path: {
+        /**
+         * Inbox link ID.
+         */
+        link_id: string;
+    };
+    query?: never;
+    url: '/email/links/{link_id}/smtp_password';
+};
+
+export type SetLinkSmtpPasswordErrors = {
+    401: ErrorResponse;
+    404: ErrorResponse;
+    422: ErrorResponse;
+    503: ErrorResponse;
+};
+
+export type SetLinkSmtpPasswordError = SetLinkSmtpPasswordErrors[keyof SetLinkSmtpPasswordErrors];
+
+export type SetLinkSmtpPasswordResponses = {
+    204: void;
+};
+
+export type SetLinkSmtpPasswordResponse = SetLinkSmtpPasswordResponses[keyof SetLinkSmtpPasswordResponses];
 
 export type SendMessageData = {
     body: SendMessageRequest;

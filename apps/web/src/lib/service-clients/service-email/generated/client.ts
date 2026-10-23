@@ -56,6 +56,7 @@ import type {
   ResyncResponse,
   SendMessageRequest,
   SendMessageResponse,
+  SetSmtpPasswordRequest,
   SharedInboxConflictResponse,
   TransferDraftRequest,
   TransferDraftResponse,
@@ -2636,6 +2637,80 @@ export const resyncLink = async (
     status: res.status,
     headers: res.headers,
   } as resyncLinkResponse;
+};
+
+/**
+ * @summary Sets the password an IMAP inbox sends with. The mail server must accept it
+first; it is then kept encrypted by the authentication service.
+ */
+export type setLinkSmtpPasswordResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type setLinkSmtpPasswordResponse401 = {
+  data: ErrorResponse;
+  status: 401;
+};
+
+export type setLinkSmtpPasswordResponse404 = {
+  data: ErrorResponse;
+  status: 404;
+};
+
+export type setLinkSmtpPasswordResponse422 = {
+  data: ErrorResponse;
+  status: 422;
+};
+
+export type setLinkSmtpPasswordResponse503 = {
+  data: ErrorResponse;
+  status: 503;
+};
+
+export type setLinkSmtpPasswordResponseSuccess =
+  setLinkSmtpPasswordResponse204 & {
+    headers: Headers;
+  };
+export type setLinkSmtpPasswordResponseError = (
+  | setLinkSmtpPasswordResponse401
+  | setLinkSmtpPasswordResponse404
+  | setLinkSmtpPasswordResponse422
+  | setLinkSmtpPasswordResponse503
+) & {
+  headers: Headers;
+};
+
+export type setLinkSmtpPasswordResponse =
+  | setLinkSmtpPasswordResponseSuccess
+  | setLinkSmtpPasswordResponseError;
+
+export const getSetLinkSmtpPasswordUrl = (linkId: string) => {
+  return `/email/links/${linkId}/smtp_password`;
+};
+
+export const setLinkSmtpPassword = async (
+  linkId: string,
+  setSmtpPasswordRequest: SetSmtpPasswordRequest,
+  options?: RequestInit
+): Promise<setLinkSmtpPasswordResponse> => {
+  const res = await fetch(getSetLinkSmtpPasswordUrl(linkId), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(setSmtpPasswordRequest),
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: setLinkSmtpPasswordResponse['data'] = body
+    ? JSON.parse(body)
+    : {};
+  return {
+    data,
+    status: res.status,
+    headers: res.headers,
+  } as setLinkSmtpPasswordResponse;
 };
 
 /**

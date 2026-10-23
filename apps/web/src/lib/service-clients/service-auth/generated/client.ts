@@ -53,6 +53,8 @@ import type {
   InitGmailLinkResponse,
   InitOutlookLinkParams,
   InitOutlookLinkResponse,
+  InitZohoLinkParams,
+  InitZohoLinkResponse,
   InviteToTeamRequest,
   JoinTeamByInviteLinkResponse,
   ListGtmInviteLinksParams,
@@ -2736,6 +2738,97 @@ export const initOutlookLink = async (
     status: res.status,
     headers: res.headers,
   } as initOutlookLinkResponse;
+};
+
+/**
+ * @summary Initiates a Zoho Mail account link for an authenticated user.
+ */
+export type initZohoLinkResponse200 = {
+  data: InitZohoLinkResponse;
+  status: 200;
+};
+
+export type initZohoLinkResponse400 = {
+  data: ErrorResponse;
+  status: 400;
+};
+
+export type initZohoLinkResponse401 = {
+  data: ErrorResponse;
+  status: 401;
+};
+
+export type initZohoLinkResponse402 = {
+  data: ErrorResponse;
+  status: 402;
+};
+
+export type initZohoLinkResponse404 = {
+  data: ErrorResponse;
+  status: 404;
+};
+
+export type initZohoLinkResponse429 = {
+  data: ErrorResponse;
+  status: 429;
+};
+
+export type initZohoLinkResponse500 = {
+  data: ErrorResponse;
+  status: 500;
+};
+
+export type initZohoLinkResponseSuccess = initZohoLinkResponse200 & {
+  headers: Headers;
+};
+export type initZohoLinkResponseError = (
+  | initZohoLinkResponse400
+  | initZohoLinkResponse401
+  | initZohoLinkResponse402
+  | initZohoLinkResponse404
+  | initZohoLinkResponse429
+  | initZohoLinkResponse500
+) & {
+  headers: Headers;
+};
+
+export type initZohoLinkResponse =
+  | initZohoLinkResponseSuccess
+  | initZohoLinkResponseError;
+
+export const getInitZohoLinkUrl = (params: InitZohoLinkParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/link/zoho?${stringifiedParams}`
+    : `/link/zoho`;
+};
+
+export const initZohoLink = async (
+  params: InitZohoLinkParams,
+  options?: RequestInit
+): Promise<initZohoLinkResponse> => {
+  const res = await fetch(getInitZohoLinkUrl(params), {
+    ...options,
+    method: 'POST',
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: initZohoLinkResponse['data'] = body ? JSON.parse(body) : {};
+  return {
+    data,
+    status: res.status,
+    headers: res.headers,
+  } as initZohoLinkResponse;
 };
 
 /**

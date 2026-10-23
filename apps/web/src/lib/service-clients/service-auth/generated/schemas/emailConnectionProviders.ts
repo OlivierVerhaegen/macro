@@ -16,4 +16,6 @@ export interface EmailConnectionProviders {
 directory. Present when Outlook is configured and the request named an
 `original_url` for the administrator's browser to return to. */
   outlook_admin_consent_url?: EmailConnectionProvidersOutlookAdminConsentUrl;
+  /** Zoho Mail over IMAP (Olive Trees fork). */
+  zoho: boolean;
 }
