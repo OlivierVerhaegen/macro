@@ -402,18 +402,21 @@ pub async fn run() -> anyhow::Result<()> {
         ),
         config.sent_undo_delay_secs,
     )
-    .with_sender_provider(email::outbound::GmailSenderProvider::new(
-        gmail_client::GmailClient::without_watch(),
-        email::outbound::GmailTokenProviderImpl::lazy(
-            redis_client.clone(),
-            Arc::new(authentication_service_client::AuthServiceClient::new(
-                config
-                    .authentication_service_secret_key
-                    .as_ref()
-                    .to_string(),
-                macro_service_urls::AuthServiceUrl::new()?.to_string(),
-            )),
+    .with_sender_provider(email::outbound::ProviderSenderProvider::new(
+        email::outbound::GmailSenderProvider::new(
+            gmail_client::GmailClient::without_watch(),
+            email::outbound::GmailTokenProviderImpl::lazy(
+                redis_client.clone(),
+                Arc::new(authentication_service_client::AuthServiceClient::new(
+                    config
+                        .authentication_service_secret_key
+                        .as_ref()
+                        .to_string(),
+                    macro_service_urls::AuthServiceUrl::new()?.to_string(),
+                )),
+            ),
         ),
+        db.clone(),
     ))
     .with_macro_event_broker(macro_event_broker.clone());
     let readonly_email_service = ReadonlyEmailPreviewAdapter(

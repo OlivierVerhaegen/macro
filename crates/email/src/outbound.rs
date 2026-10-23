@@ -8,6 +8,8 @@ mod gmail_sender_provider;
 mod gmail_token_provider;
 #[cfg(feature = "outbound")]
 pub mod invitation_pg;
+#[cfg(feature = "outbound")]
+mod provider_sender_provider;
 #[cfg(feature = "s3")]
 mod s3_draft_attachment_storage;
 
@@ -21,5 +23,7 @@ pub use email_service_http::EmailServiceHttpClient;
 pub use gmail_sender_provider::GmailSenderProvider;
 #[cfg(feature = "gmail_token")]
 pub use gmail_token_provider::GmailTokenProviderImpl;
+#[cfg(feature = "outbound")]
+pub use provider_sender_provider::ProviderSenderProvider;
 #[cfg(feature = "s3")]
 pub use s3_draft_attachment_storage::S3DraftAttachmentStorage;

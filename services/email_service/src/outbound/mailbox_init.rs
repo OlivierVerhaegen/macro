@@ -79,6 +79,7 @@ impl CompletedMailboxGrantSource for ZohoGrantSource {
                 smtp_host: grant.data_center.smtp_host(),
                 smtp_port: ZOHO_SMTP_PORT,
                 username: grant.email.clone(),
+                send_addresses: grant.send_addresses,
             }),
             email: grant.email,
             tenant_id: grant.zuid,
@@ -377,12 +378,12 @@ impl MailboxInitializationRepository for PgMailboxInitialization {
                 link_id,grant.generation,&grant.scopes,grant.calendar_requested).execute(&mut *tx).await.map_err(unavailable)?;
         }
         if let Some(server) = &grant.imap_server {
-            sqlx::query!(r#"INSERT INTO imap_accounts(link_id,imap_host,imap_port,smtp_host,smtp_port,smtp_security,username,auth_method)
-                VALUES ($1,$2,$3,$4,$5,'tls',$6,'zoho_oauth')
+            sqlx::query!(r#"INSERT INTO imap_accounts(link_id,imap_host,imap_port,smtp_host,smtp_port,smtp_security,username,auth_method,send_addresses)
+                VALUES ($1,$2,$3,$4,$5,'tls',$6,'zoho_oauth',$7)
                 ON CONFLICT(link_id) DO UPDATE SET imap_host = EXCLUDED.imap_host,imap_port = EXCLUDED.imap_port,
                     smtp_host = EXCLUDED.smtp_host,smtp_port = EXCLUDED.smtp_port,smtp_security = EXCLUDED.smtp_security,
-                    username = EXCLUDED.username,auth_method = EXCLUDED.auth_method,updated_at = now()"#,
-                link_id,server.imap_host,i32::from(server.imap_port),server.smtp_host,i32::from(server.smtp_port),server.username)
+                    username = EXCLUDED.username,auth_method = EXCLUDED.auth_method,send_addresses = EXCLUDED.send_addresses,updated_at = now()"#,
+                link_id,server.imap_host,i32::from(server.imap_port),server.smtp_host,i32::from(server.smtp_port),server.username,&server.send_addresses)
                 .execute(&mut *tx).await.map_err(unavailable)?;
         }
         if owner != request.actor {

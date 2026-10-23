@@ -28,8 +28,8 @@ where
             .iter()
             .find(|link| link.id == link_id)
             .ok_or(EmailErr::InboxNotFound)?;
-        // Only Gmail exposes send-as aliases; other mailboxes send as themselves.
-        if link.provider != crate::domain::models::UserProvider::Gmail {
+        // Gmail and IMAP (Zoho) expose send-as aliases; Outlook sends as itself.
+        if link.provider == crate::domain::models::UserProvider::Outlook {
             return Ok(vec![crate::domain::senders::SendAsAddress {
                 email_address: link.email_address.clone(),
                 display_name: None,

@@ -200,7 +200,7 @@ Een eigen crate `zoho_client` met de datacenterkeuze, een token-provider
 via de auth-service en een rate-limiter (30 calls/minuut per account). In
 fase 1 gebruikt voor:
 
-- accountgegevens: `accountId`, primair adres, aliassen en verzendadressen
+- accountgegevens: `accountId`, primair adres, aliassen en verzendadressen (gebouwd: bij het koppelen bewaard in `imap_accounts.send_addresses` en aangeboden als afzenders)
   (`GET /accounts`), bij het koppelen en daarna dagelijks;
 - handtekeningen (`GET /accounts/{id}/signatures`), op dezelfde momenten;
 - labels lezen en zetten, als labels niet via IMAP beschikbaar zijn.

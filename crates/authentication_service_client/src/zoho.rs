@@ -27,6 +27,9 @@ pub struct CompletedZohoGrant {
     pub zuid: String,
     pub account_id: String,
     pub scopes: Vec<String>,
+    /// Every address the account may send as, primary included.
+    #[serde(default)]
+    pub send_addresses: Vec<String>,
 }
 
 impl AuthServiceClient {

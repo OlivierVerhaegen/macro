@@ -49,6 +49,8 @@ pub struct ImapServerSettings {
     pub smtp_host: String,
     pub smtp_port: u16,
     pub username: String,
+    /// Addresses the account may send as, primary included.
+    pub send_addresses: Vec<String>,
 }
 
 #[derive(Debug, Clone)]

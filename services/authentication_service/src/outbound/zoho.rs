@@ -112,6 +112,7 @@ impl ZohoIdentityProvider for ZohoOAuthProvider {
             zuid: account.zuid,
             account_id: account.account_id,
             email,
+            send_addresses: account.send_addresses,
             // Zoho grants the requested scopes as a whole or not at all, and a
             // successful accounts read proves the grant is live.
             scopes: scopes::MAILBOX.map(str::to_owned).to_vec(),

@@ -186,10 +186,13 @@ async fn final_shared_disconnect_freezes_ingestion_and_keeps_revocation_after_ca
 #[sqlx::test(migrator = "MACRO_DB_MIGRATIONS")]
 async fn disconnecting_an_imap_inbox_leaves_its_zoho_grant_to_collection(db: PgPool) {
     let (repo, link, _) = shared(&db).await;
-    sqlx::query!("UPDATE email_links SET provider = 'IMAP' WHERE id = $1", link)
-        .execute(&db)
-        .await
-        .unwrap();
+    sqlx::query!(
+        "UPDATE email_links SET provider = 'IMAP' WHERE id = $1",
+        link
+    )
+    .execute(&db)
+    .await
+    .unwrap();
     let service = InboxLifecycleService::new(repo, Effects);
     service.remove(&actor("remaining"), link).await.unwrap();
     service.remove(&actor("leaving"), link).await.unwrap();

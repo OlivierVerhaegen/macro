@@ -64,6 +64,8 @@ pub struct VerifiedZohoGrant {
     pub zuid: String,
     pub account_id: String,
     pub email: String,
+    /// Every address the account may send as, primary included.
+    pub send_addresses: Vec<String>,
     pub scopes: Vec<String>,
     pub refresh_token: ZohoRefreshToken,
 }
@@ -91,6 +93,8 @@ pub struct CompletedZohoGrant {
     pub zuid: String,
     pub account_id: String,
     pub scopes: Vec<String>,
+    /// Every address the account may send as, as Zoho reported at consent.
+    pub send_addresses: Vec<String>,
 }
 
 pub struct RefreshedZohoToken {

@@ -64,6 +64,9 @@ tools — hexagonal, heavily feature-gated.
   domain service, never an outbound adapter directly from another crate.
 - Sender discovery authorizes the inbox first. Gmail aliases use the sender
   provider; Outlook exposes its verified primary address without a Gmail lookup.
+  IMAP (Zoho) aliases come from `imap_accounts.send_addresses`, copied from
+  the Zoho grant at connect, through `ProviderSenderProvider`; they refresh on
+  reconnect.
 - The mailbox runtime serves Outlook and IMAP (Zoho Mail). `PgMailboxSync::new`
   claims Outlook work; `PgMailboxSync::for_provider(db, UserProvider::Imap)`
   claims IMAP work, so each provider's workers run with their own gateway.

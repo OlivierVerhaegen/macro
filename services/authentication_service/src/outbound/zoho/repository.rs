@@ -223,8 +223,8 @@ impl ZohoGrantRepository for PgZohoGrants {
             INSERT INTO zoho_oauth_grants
                 (grant_id, fusionauth_user_id, email_address, data_center, zoho_user_id,
                  zoho_account_id, scopes, refresh_token_ciphertext, encrypted_data_key, nonce,
-                 encryption_version, kms_key_id, generation)
-            SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+                 encryption_version, kms_key_id, send_addresses, generation)
+            SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
                 COALESCE((SELECT max(g.generation) FROM zoho_oauth_grants g
                     WHERE g.fusionauth_user_id = $2 AND g.email_address = $3), 0) + 1
             WHERE NOT EXISTS(SELECT 1 FROM zoho_oauth_grants g
@@ -242,7 +242,8 @@ impl ZohoGrantRepository for PgZohoGrants {
             envelope.encrypted_data_key,
             envelope.nonce,
             i32::from(envelope.encryption_version),
-            envelope.kms_key_id
+            envelope.kms_key_id,
+            &identity.send_addresses
         )
         .execute(&mut *tx)
         .await
@@ -287,7 +288,7 @@ impl ZohoGrantRepository for PgZohoGrants {
         let row = sqlx::query!(
             r#"
             SELECT g.grant_id, g.generation, g.email_address, g.data_center, g.zoho_user_id,
-                g.zoho_account_id, g.scopes
+                g.zoho_account_id, g.scopes, g.send_addresses
             FROM in_progress_user_link p
             JOIN zoho_link_attempts a ON a.id = p.id AND a.completed_at IS NOT NULL
             JOIN zoho_oauth_grants g ON g.grant_id = a.grant_id
@@ -311,6 +312,7 @@ impl ZohoGrantRepository for PgZohoGrants {
             zuid: row.zoho_user_id,
             account_id: row.zoho_account_id,
             scopes: row.scopes,
+            send_addresses: row.send_addresses,
         })
     }
 
