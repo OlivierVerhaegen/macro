@@ -1,0 +1,38 @@
+# One AWS endpoint for every service (LOCAL_AWS_URL=http://localstack:4566).
+# JSON-protocol AWS APIs name their service in X-Amz-Target; S3 does not, so
+# everything else is S3. Upstreams are overridable for tests outside compose.
+{
+	admin off
+	auto_https off
+}
+
+:4566 {
+	@sqs header X-Amz-Target AmazonSQS.*
+	handle @sqs {
+		reverse_proxy {$SQS_UPSTREAM:sqs:9324}
+	}
+
+	@dynamodb header X-Amz-Target DynamoDB_20120810.*
+	handle @dynamodb {
+		reverse_proxy {$DYNAMODB_UPSTREAM:dynamodb:8000}
+	}
+
+	@kms header X-Amz-Target TrentService.*
+	handle @kms {
+		reverse_proxy {$KMS_UPSTREAM:kms:8080}
+	}
+
+	# s3proxy has no bucket notifications. Accept the configuration the
+	# provisioning step writes; upload events reach SQS through the relay.
+	@notification {
+		method PUT GET
+		expression {query} == "notification"
+	}
+	handle @notification {
+		respond `<?xml version="1.0" encoding="UTF-8"?><NotificationConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/"/>` 200
+	}
+
+	handle {
+		reverse_proxy {$S3_UPSTREAM:s3:80}
+	}
+}

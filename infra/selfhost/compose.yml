@@ -1,0 +1,230 @@
+# Olive Trees: Macro on one server, without AWS. See docs/ota/plan-fase-0.md.
+#
+# Infrastructure only for now; the services follow. Every container joins the
+# `backend` network under the hostname the generated env (cargo x) expects:
+# postgres, redis, search, kafka, fusionauth and localstack (the AWS gateway).
+# Nothing here publishes a port; the public Caddy (later) is the only entrance.
+#
+# Secrets come from the environment file the render step writes on the server
+# (`--env-file /etc/macro/selfhost.env`); the `:?` guards stop compose when one
+# is missing instead of starting with an empty password.
+name: macro-selfhost
+
+x-defaults: &defaults
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "3"
+  networks:
+    - backend
+
+services:
+  postgres:
+    <<: *defaults
+    image: pgvector/pgvector:pg18
+    command: postgres -c max_connections=500
+    environment:
+      POSTGRES_USER: macro
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in the selfhost env file}
+      POSTGRES_DB: macrodb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U macro -d macrodb"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      # pg18+ keeps PGDATA in a version-specific subdirectory of this mount.
+      - postgres:/var/lib/postgresql
+
+  redis:
+    <<: *defaults
+    image: redis/redis-stack-server:7.4.0-v3
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - redis:/data
+
+  kafka:
+    <<: *defaults
+    # Same broker as the local stack (single-node KRaft) so topics and client
+    # settings behave identically; Redpanda can replace it later to save memory.
+    image: apache/kafka:3.9.1
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
+      # A fixed cluster id lets the volume survive container recreation.
+      CLUSTER_ID: T2xpdmVUcmVlc01hY3JvMQ
+    healthcheck:
+      test: /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:29092 > /dev/null 2>&1
+      interval: 10s
+      timeout: 10s
+      retries: 20
+    volumes:
+      - kafka:/var/lib/kafka/data
+
+  search:
+    <<: *defaults
+    # The local stack's image: OpenSearch 3.5 with analysis-icu, which the
+    # channels index needs.
+    build:
+      context: ../local/opensearch
+    image: macro-selfhost-opensearch:3.5.0
+    environment:
+      cluster.name: search
+      discovery.type: single-node
+      node.name: search
+      # Only the backend network reaches it; there is no public route.
+      plugins.security.disabled: "true"
+      bootstrap.memory_lock: "true"
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+      OPENSEARCH_INITIAL_ADMIN_PASSWORD: ${OPENSEARCH_PASSWORD:?set in the selfhost env file}
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: curl --fail --silent --output /dev/null http://localhost:9200/
+      interval: 10s
+      retries: 60
+    volumes:
+      - opensearch:/usr/share/opensearch/data
+
+  fusionauth-db:
+    <<: *defaults
+    image: postgres:16.0-bookworm
+    environment:
+      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${FUSIONAUTH_DB_PASSWORD:?set in the selfhost env file}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - fusionauth-db:/var/lib/postgresql/data
+
+  fusionauth:
+    <<: *defaults
+    image: fusionauth/fusionauth-app:1.62.1
+    init: true
+    depends_on:
+      fusionauth-db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: jdbc:postgresql://fusionauth-db:5432/fusionauth
+      DATABASE_ROOT_USERNAME: postgres
+      DATABASE_ROOT_PASSWORD: ${FUSIONAUTH_DB_PASSWORD:?set in the selfhost env file}
+      DATABASE_USERNAME: fusionauth
+      DATABASE_PASSWORD: ${FUSIONAUTH_DB_PASSWORD:?set in the selfhost env file}
+      # The render step writes a kickstart with this server's own secrets.
+      FUSIONAUTH_APP_KICKSTART_FILE: /usr/local/fusionauth/kickstart/kickstart.json
+      FUSIONAUTH_APP_MEMORY: 512M
+      FUSIONAUTH_APP_RUNTIME_MODE: production
+      FUSIONAUTH_APP_URL: http://fusionauth:9011
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9011/api/status | grep -q '\"status\":\"Ok\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    volumes:
+      - fusionauth-config:/usr/local/fusionauth/config
+      - ${MACRO_SELFHOST_DIR:-/etc/macro}/kickstart:/usr/local/fusionauth/kickstart:ro
+
+  # --- AWS replacements, behind one endpoint ---------------------------------
+  # The services know one AWS endpoint (LOCAL_AWS_URL). The gateway answers on
+  # it as `localstack:4566` and routes each request to its emulator.
+  aws-gateway:
+    <<: *defaults
+    image: caddy:2.10-alpine
+    networks:
+      backend:
+        aliases:
+          - localstack
+    volumes:
+      - ./aws-gateway/Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - sqs
+      - dynamodb
+      - kms
+      - s3
+
+  sqs:
+    <<: *defaults
+    image: softwaremill/elasticmq-native:1.7.1
+    # The image's user cannot write to a fresh named volume.
+    user: root
+    volumes:
+      - ./elasticmq/elasticmq.conf:/opt/elasticmq.conf:ro
+      - sqs:/data
+
+  dynamodb:
+    <<: *defaults
+    image: amazon/dynamodb-local:3.3.2
+    # The image's user cannot write to a fresh named volume.
+    user: root
+    working_dir: /home/dynamodblocal
+    command: -jar DynamoDBLocal.jar -sharedDb -dbPath /data
+    volumes:
+      - dynamodb:/data
+
+  kms:
+    <<: *defaults
+    image: nsmithuk/local-kms:3.12.0
+    environment:
+      PORT: "8080"
+      # Keys must outlive restarts, or what they encrypted is lost for good.
+      KMS_DATA_PATH: /data
+    volumes:
+      - kms:/data
+
+  s3:
+    <<: *defaults
+    image: andrewgaul/s3proxy:s3proxy-2.9.0
+    environment:
+      # Presigned URLs are rewritten to the public address, which breaks their
+      # signature, so s3proxy does not check signatures. Only the gateway and
+      # the public storage route reach it.
+      S3PROXY_AUTHORIZATION: none
+      S3PROXY_ENDPOINT: http://0.0.0.0:80
+      S3PROXY_IGNORE_UNKNOWN_HEADERS: "true"
+      S3PROXY_CORS_ALLOW_ALL: "true"
+      JCLOUDS_PROVIDER: filesystem
+      JCLOUDS_FILESYSTEM_BASEDIR: /data
+    volumes:
+      - s3:/data
+
+networks:
+  backend:
+
+volumes:
+  postgres:
+  redis:
+  kafka:
+  opensearch:
+  fusionauth-db:
+  fusionauth-config:
+  sqs:
+  dynamodb:
+  kms:
+  s3:
