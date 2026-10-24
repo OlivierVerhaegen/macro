@@ -8,17 +8,29 @@ notification that AWS would send to that bucket's queue: `ObjectCreated:Put`,
 `:Copy` or `:CompleteMultipartUpload`. Upload parts and failed writes send
 nothing.
 
+s3proxy checks no signatures, so the relay does it for the public side: a
+second listener (PUBLIC_PORT, for the public Caddy) accepts only requests
+carrying a valid, unexpired presigned SigV4 signature, made with the services'
+AWS secret for the internal host they signed (SIGNED_HOST). Unsigned GET and
+HEAD are allowed on the PUBLIC_READ buckets (the static-file CDN). The internal
+listener (PORT, for the AWS gateway) trusts the backend network.
+
 Environment: S3_UPSTREAM (host:port of s3proxy), NOTIFY (comma-separated
-`bucket=queue-url`), PORT (default 8080). The queue is SQS-compatible
-(ElasticMQ, behind the AWS gateway) and reached without signing.
+`bucket=queue-url`), PORT (default 8080), PUBLIC_PORT (default 8081),
+AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, SIGNED_HOST (default
+localstack:4566), PUBLIC_READ (comma-separated buckets). The queue is
+SQS-compatible (ElasticMQ, behind the AWS gateway) and reached without signing.
 """
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import http.client
 import json
 import os
 import sys
+import threading
 import time
 import urllib.parse
 import urllib.request
@@ -97,7 +109,78 @@ def send_message(queue_url: str, body: dict) -> None:
         response.read()
 
 
-def handler_for(upstream: str, targets: dict[str, str], send=send_message):
+class PresignedAccess:
+    """Allow a public request only with a valid presigned SigV4 query signature."""
+
+    def __init__(self, access_key: str, secret_key: str, signed_host: str, public_read: set[str], clock=time.time):
+        self.access_key = access_key
+        self.secret_key = secret_key
+        self.signed_host = signed_host
+        self.public_read = public_read
+        self.clock = clock
+
+    def denied(self, method: str, path: str, query: str, headers) -> str | None:
+        """None when allowed, else the reason (for the log, never the client)."""
+        params = urllib.parse.parse_qsl(query, keep_blank_values=True)
+        values = dict(params)
+        if "X-Amz-Signature" not in values:
+            bucket = path.lstrip("/").partition("/")[0]
+            if method in ("GET", "HEAD") and bucket in self.public_read:
+                return None
+            return "unsigned"
+        if values.get("X-Amz-Algorithm") != "AWS4-HMAC-SHA256":
+            return "algorithm"
+        credential = values.get("X-Amz-Credential", "").split("/")
+        if len(credential) != 5 or credential[0] != self.access_key or credential[3:] != ["s3", "aws4_request"]:
+            return "credential"
+        try:
+            signed_at = datetime.strptime(values["X-Amz-Date"], "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+            expires = int(values["X-Amz-Expires"])
+        except (KeyError, ValueError):
+            return "date"
+        if not signed_at.strftime("%Y%m%d") == credential[1]:
+            return "date"
+        if not signed_at.timestamp() - 300 <= self.clock() <= signed_at.timestamp() + expires:
+            return "expired"
+        signed_headers = values.get("X-Amz-SignedHeaders", "host").split(";")
+        header_lines = []
+        for name in signed_headers:
+            value = self.signed_host if name == "host" else headers.get(name)
+            if value is None:
+                return "headers"
+            header_lines.append(f"{name}:{' '.join(value.split())}\n")
+        canonical_query = "&".join(
+            f"{quote(k)}={quote(v)}" for k, v in sorted((k, v) for k, v in params if k != "X-Amz-Signature")
+        )
+        canonical = "\n".join(
+            [
+                method,
+                path,
+                canonical_query,
+                "".join(header_lines),
+                ";".join(signed_headers),
+                values.get("X-Amz-Content-Sha256", "UNSIGNED-PAYLOAD"),
+            ]
+        )
+        scope = "/".join(credential[1:])
+        to_sign = "\n".join(
+            ["AWS4-HMAC-SHA256", values["X-Amz-Date"], scope, hashlib.sha256(canonical.encode()).hexdigest()]
+        )
+        key = ("AWS4" + self.secret_key).encode()
+        for part in credential[1:]:
+            key = hmac.new(key, part.encode(), hashlib.sha256).digest()
+        expected = hmac.new(key, to_sign.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(expected, values["X-Amz-Signature"]):
+            return "signature"
+        return None
+
+
+def quote(value: str) -> str:
+    """SigV4's URI encoding: everything but unreserved characters."""
+    return urllib.parse.quote(value, safe="-_.~")
+
+
+def handler_for(upstream: str, targets: dict[str, str], send=send_message, access: PresignedAccess | None = None):
     host, _, port = upstream.partition(":")
 
     class Handler(BaseHTTPRequestHandler):
@@ -106,6 +189,15 @@ def handler_for(upstream: str, targets: dict[str, str], send=send_message):
         def proxy(self):
             started = time.monotonic()
             path, _, query = self.path.partition("?")
+            if access and (reason := access.denied(self.command, path, query, self.headers)):
+                log("relay.denied", method=self.command, reason=reason)
+                # The body was not read, so this connection cannot be reused.
+                self.close_connection = True
+                self.send_response(403)
+                self.send_header("Content-Length", "0")
+                self.send_header("Connection", "close")
+                self.end_headers()
+                return
             headers = {k: v for k, v in self.headers.items() if k.lower() not in HOP_BY_HOP}
             chunked = "chunked" in self.headers.get("Transfer-Encoding", "").lower()
             length = None if chunked else int(self.headers.get("Content-Length") or 0)
@@ -201,10 +293,23 @@ def handler_for(upstream: str, targets: dict[str, str], send=send_message):
 def main() -> None:
     upstream = os.environ.get("S3_UPSTREAM") or sys.exit("S3_UPSTREAM is required")
     targets = parse_notify(os.environ.get("NOTIFY", ""))
-    server = ThreadingHTTPServer(("0.0.0.0", int(os.environ.get("PORT", "8080"))), handler_for(upstream, targets))
-    server.daemon_threads = True
-    log("relay.ready", buckets=sorted(targets))
-    server.serve_forever()
+    access = PresignedAccess(
+        os.environ.get("AWS_ACCESS_KEY_ID") or sys.exit("AWS_ACCESS_KEY_ID is required"),
+        os.environ.get("AWS_SECRET_ACCESS_KEY") or sys.exit("AWS_SECRET_ACCESS_KEY is required"),
+        os.environ.get("SIGNED_HOST", "localstack:4566"),
+        {b.strip() for b in os.environ.get("PUBLIC_READ", "").split(",") if b.strip()},
+    )
+    servers = [
+        ThreadingHTTPServer(("0.0.0.0", int(os.environ.get("PORT", "8080"))), handler_for(upstream, targets)),
+        ThreadingHTTPServer(
+            ("0.0.0.0", int(os.environ.get("PUBLIC_PORT", "8081"))), handler_for(upstream, targets, access=access)
+        ),
+    ]
+    for server in servers:
+        server.daemon_threads = True
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+    log("relay.ready", buckets=sorted(targets), public_read=sorted(access.public_read))
+    threading.Event().wait()
 
 
 if __name__ == "__main__":

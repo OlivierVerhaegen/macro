@@ -219,8 +219,8 @@ services:
     image: andrewgaul/s3proxy:s3proxy-2.9.0
     environment:
       # Presigned URLs are rewritten to the public address, which breaks their
-      # signature, so s3proxy does not check signatures. Only the gateway and
-      # the public storage route reach it.
+      # signature for s3proxy, so it checks none; upload-relay verifies them
+      # on the public side. Only the relay reaches it.
       S3PROXY_AUTHORIZATION: none
       S3PROXY_ENDPOINT: http://0.0.0.0:80
       S3PROXY_IGNORE_UNKNOWN_HEADERS: "true"
@@ -368,8 +368,11 @@ services:
     volumes:
       - ./lambda-clock/clock.py:/clock/clock.py:ro
 
-  # s3proxy sends no bucket notifications; the relay sits in front of it and
-  # sends doc-storage's ObjectCreated events to the upload finalizer's queue.
+  # s3proxy sends no bucket notifications and checks no signatures. The relay
+  # sits in front of it: it sends doc-storage's ObjectCreated events to the
+  # upload finalizer's queue, and on its public port (8081, for the public
+  # Caddy) it lets through only presigned requests signed with the services'
+  # AWS secret, plus reads of the static-file bucket.
   upload-relay:
     <<: *defaults
     image: python:3.13-alpine3.22
@@ -377,6 +380,9 @@ services:
     environment:
       S3_UPSTREAM: s3:80
       NOTIFY: doc-storage=http://localstack:4566/000000000000/document-upload-finalizer-queue
+      PUBLIC_READ: static-file-storage
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?set in the selfhost env file}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?set in the selfhost env file}
     volumes:
       - ./upload-relay/relay.py:/relay/relay.py:ro
     depends_on:

@@ -3,6 +3,9 @@
 [server]
 # The public name; DNS points it at this server and Caddy gets its certificate.
 domain = macro.olivetrees-agency.be
+# Comma-separated addresses that may create an account; everyone else is
+# refused at signup (Macro also admits @macro.com addresses).
+signup_allowlist = you@example.com
 
 [mail]
 # Sender for login codes and notifications. Zoho only relays addresses the

@@ -65,7 +65,9 @@ ROTATED_KEYS = [
 # FusionAuth API keys must look like its own (a UUID); the rest are opaque.
 UUID_SHAPED = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 API_TOKEN_KEYS = ("MACRO_API_TOKEN_PRIVATE_SECRET_KEY", "MACRO_API_TOKEN_PUBLIC_KEY")
-INFRA_PASSWORDS = ("POSTGRES_PASSWORD", "FUSIONAUTH_DB_PASSWORD")
+# Generated once and kept. The AWS secret signs presigned storage URLs, which
+# the upload relay verifies on the public side; the emulators ignore it.
+INFRA_PASSWORDS = ("POSTGRES_PASSWORD", "FUSIONAUTH_DB_PASSWORD", "AWS_SECRET_ACCESS_KEY")
 # The FusionAuth image runs as this user and reads the kickstart.
 FUSIONAUTH_UID = 1001
 
@@ -185,10 +187,11 @@ def publish(env: dict[str, str], conf: configparser.ConfigParser, state: dict) -
             "EMAIL_SERVICE_CLOUDFRONT_DISTRIBUTION_URL": f"{public}/static-file",
             "PIPEDREAM_ALLOWED_ORIGINS": public,
             "SENDER_BASE_ADDRESS": conf["mail"]["sender_domain"],
+            # Only these addresses can sign up; the server never runs open.
+            "DEVELOPMENT_SIGNUP_ALLOWLIST_JSON": json.dumps(signup_allowlist(conf)),
             "SMTP_HOST": "mailrelay",
             "SMTP_PORT": "25",
-            "POSTGRES_PASSWORD": password,
-            "FUSIONAUTH_DB_PASSWORD": state["infra"]["FUSIONAUTH_DB_PASSWORD"],
+            **{key: state["infra"][key] for key in INFRA_PASSWORDS},
         }
     )
     env["PIPEDREAM_WEBHOOK_URI"] = re.sub(
@@ -196,6 +199,14 @@ def publish(env: dict[str, str], conf: configparser.ConfigParser, state: dict) -
     )
     for key, value in conf["env"].items() if conf.has_section("env") else []:
         env[key.upper()] = value
+
+
+def signup_allowlist(conf: configparser.ConfigParser) -> list[str]:
+    raw = conf.get("server", "signup_allowlist", fallback="")
+    emails = [email.strip().lower() for email in raw.split(",") if email.strip()]
+    if not emails or not all(re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email) for email in emails):
+        fail("[server] signup_allowlist must list the email addresses that may sign up")
+    return emails
 
 
 def render_kickstart(path: Path, mapping: dict[str, str], env: dict[str, str], conf) -> str:
