@@ -11,7 +11,8 @@ set -euo pipefail
 name="${1:?usage: publish.sh <name> <dockerfile> <context> [--check-libs]}"
 dockerfile="${2:?}"
 context="${3:?}"
-image="$REGISTRY/$name"
+# Image references must be lowercase; GitHub owners need not be.
+image="${REGISTRY,,}/$name"
 
 printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
 DOCKER_BUILDKIT=1 docker build -f "$dockerfile" \
