@@ -19,6 +19,8 @@ persists to a named volume.
 - `compose.yml`: the services, their hostnames and volumes.
 - `aws-gateway/Caddyfile`: the AWS routing.
 - `elasticmq/elasticmq.conf`: SQS queue URLs and persistence.
+- `render.py`: turns the upstream-generated local env and FusionAuth kickstart
+  into the server's configuration (`/etc/macro`), with fresh secrets.
 
 ## Scope
 
@@ -42,4 +44,7 @@ persists to a named volume.
 - ElasticMQ and DynamoDB Local run as root: their images cannot write to a
   fresh named volume otherwise.
 - The local identity in `xtask_local/src/local/identity.rs` is public; a
-  self-hosted server must replace every secret (see the plan).
+  self-hosted server must replace every secret. `render.py` rotates the keys in
+  `ROTATED_KEYS` by value (settings that shared a value keep sharing one) and
+  fails when one of them is no longer generated; review that list when the
+  generated env gains a secret.

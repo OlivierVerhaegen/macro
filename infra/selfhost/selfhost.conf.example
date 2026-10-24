@@ -1,0 +1,28 @@
+# Copy to /etc/macro/selfhost.conf (mode 600) and fill in. render.py reads it.
+
+[server]
+# The public name; DNS points it at this server and Caddy gets its certificate.
+domain = macro.olivetrees-agency.be
+
+[mail]
+# Sender for login codes and notifications. Zoho only relays addresses the
+# account owns (its primary address or an alias).
+from = noreply@olivetrees-agency.be
+# Domain for generated notification senders (SENDER_BASE_ADDRESS).
+sender_domain = olivetrees-agency.be
+
+[relay]
+# The SMTP relay logs in to Zoho with an app password (Zoho SMTP takes no
+# OAuth). Paid organizations on their own domain use smtppro.
+host = smtppro.zoho.eu
+port = 587
+username = tech@olivetrees-agency.be
+password = REPLACE_WITH_ZOHO_APP_PASSWORD
+
+[env]
+# Optional: real values for integrations, written into the service env as-is,
+# for example the Zoho client of phase 1 and model API keys.
+# zoho_client_id = ...
+# zoho_client_secret = ...
+# local_token_encryption_key = (base64 of 32 random bytes; keep a backup)
+# anthropic_api_key = ...

@@ -39,6 +39,9 @@ enum Cmd {
     KafkaProvision(InstanceArgs),
     /// Restore missing local AWS resources without resetting databases or volumes.
     LocalstackProvision(InstanceArgs),
+    /// Write the instance's FusionAuth kickstart and print its path (used by
+    /// the self-hosted render step, which replaces its local identity).
+    WriteKickstart(InstanceArgs),
     /// Preflight checks (docker, toolchain, ports, env sources, images).
     DoctorLocal(InstanceArgs),
     /// Show an instance's endpoints and container states without starting anything.
@@ -273,6 +276,17 @@ fn run(cli: Cli) -> Result<()> {
         Cmd::LocalstackProvision(a) => {
             let instance = super::instance::Instance::derive(a.instance.as_deref(), a.port_base)?;
             super::localstack::provision(&instance)
+        }
+        Cmd::WriteKickstart(a) => {
+            let instance = super::instance::Instance::derive(a.instance.as_deref(), a.port_base)?;
+            super::fusionauth::write_kickstart(&instance, None, None)?;
+            println!(
+                "{}",
+                super::gen_compose::kickstart_dir(&instance)
+                    .join("kickstart.json")
+                    .display()
+            );
+            Ok(())
         }
         Cmd::DoctorLocal(a) => super::doctor::run(&a),
         Cmd::StatusLocal(a) => {
