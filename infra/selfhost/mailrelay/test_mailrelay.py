@@ -24,11 +24,11 @@ class RelayTest(unittest.TestCase):
         self.addCleanup(server.shutdown)
         return smtplib.SMTP("127.0.0.1", server.server_address[1], timeout=10)
 
-    def message(self, body="Je code is 123456.\n.leading dot line"):
+    def message(self, body="Your code is 123456.\n.leading dot line"):
         message = EmailMessage()
         message["From"] = "noreply@example.test"
         message["To"] = "owner@example.test"
-        message["Subject"] = "Inloggen bij Macro – code"
+        message["Subject"] = "Sign in to Macro – code"
         message.set_content(body)
         return message
 
@@ -40,7 +40,7 @@ class RelayTest(unittest.TestCase):
         self.assertEqual(sender, "noreply@example.test")
         self.assertEqual(recipients, ["owner@example.test", "b@example.test"])
         self.assertIn(b"\n.leading dot line", data)
-        self.assertIn(b"Subject: Inloggen bij Macro =?utf-8?b?4oCT?= code", data)
+        self.assertIn(b"Subject: Sign in to Macro =?utf-8?b?4oCT?= code", data)
 
     def test_upstream_errors_reach_the_sender(self):
         cases = [
