@@ -56,3 +56,7 @@ persists to a named volume.
   `ROTATED_KEYS` by value (settings that shared a value keep sharing one) and
   fails when one of them is no longer generated; review that list when the
   generated env gains a secret.
+- FusionAuth runs as uid 1001 and must read the kickstart, so `render.py`
+  (run as root) gives it `kickstart/`. The kickstart only applies to an empty
+  FusionAuth database, and the container reports healthy before it finishes;
+  wait for the API key to answer 200 before calling it.

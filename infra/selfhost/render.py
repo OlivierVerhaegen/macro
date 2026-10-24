@@ -14,9 +14,10 @@ local addresses. This script turns them into a configuration for one server:
 
 Secrets are kept in `<dir>/secrets.json`, so rendering again keeps them; the
 outputs are `<dir>/selfhost.env` and `<dir>/kickstart/kickstart.json`, all
-mode 600. Nothing secret is written inside the repository.
+mode 600; the kickstart belongs to FusionAuth's container user, which must read
+it. Nothing secret is written inside the repository.
 
-Usage: render.py [--dir /etc/macro]   (run from a checkout, needs cargo)
+Usage: render.py [--dir /etc/macro]   (as root, from a checkout, needs cargo)
 """
 
 from __future__ import annotations
@@ -65,6 +66,8 @@ ROTATED_KEYS = [
 UUID_SHAPED = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 API_TOKEN_KEYS = ("MACRO_API_TOKEN_PRIVATE_SECRET_KEY", "MACRO_API_TOKEN_PUBLIC_KEY")
 INFRA_PASSWORDS = ("POSTGRES_PASSWORD", "FUSIONAUTH_DB_PASSWORD")
+# The FusionAuth image runs as this user and reads the kickstart.
+FUSIONAUTH_UID = 1001
 
 
 def fail(message: str) -> None:
@@ -101,12 +104,19 @@ def dotenv_line(key: str, value: str) -> str:
     return f"{key}={value}" if plain else f"{key}={json.dumps(value, ensure_ascii=False)}"
 
 
-def write_private(path: Path, text: str) -> None:
+def write_private(path: Path, text: str, owner: int | None = None) -> None:
+    """Mode 600 (directory 700), optionally owned by a container's user."""
     path.parent.mkdir(parents=True, exist_ok=True)
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w") as handle:
         handle.write(text)
     os.chmod(path, 0o600)
+    if owner is not None:
+        if os.geteuid() != 0:
+            fail(f"run as root so {path} can belong to uid {owner}")
+        os.chmod(path.parent, 0o700)
+        os.chown(path.parent, owner, owner)
+        os.chown(path, owner, owner)
 
 
 def new_secret(old: str) -> str:
@@ -250,7 +260,7 @@ def main() -> None:
 
     write_private(state_path, json.dumps(state, indent=2) + "\n")
     write_private(out / "selfhost.env", "".join(f"{dotenv_line(k, v)}\n" for k, v in sorted(env.items())))
-    write_private(out / "kickstart" / "kickstart.json", kickstart)
+    write_private(out / "kickstart" / "kickstart.json", kickstart, owner=FUSIONAUTH_UID)
     print(f"render: wrote {out / 'selfhost.env'} and {out / 'kickstart/kickstart.json'}")
 
 
