@@ -87,9 +87,6 @@ jobs:
       env:
         REGISTRY: ghcr.io/${{ github.repository_owner }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - name: Teardown Nix
-      if: always()
-      uses: './.github/actions/teardown-nix'
   node:
     if: github.repository != 'macro-inc/macro'
     name: ${{ matrix.name }}

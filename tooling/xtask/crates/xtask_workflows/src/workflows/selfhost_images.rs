@@ -119,11 +119,12 @@ fn web_job() -> Job {
                 .add_env(("VITE_LOCAL_SERVERS", "ALL"))
                 .add_env(("VITE_LOCAL_BACKEND_ORIGIN", "same-origin")),
         )
+        // No teardown_nix: it frees Namespace's /nix cache volume, which this
+        // runner lacks, and its `fuser -km /nix` kills the dev shell's own bash.
         .add_step(publish(
             "macro-web",
             "infra/selfhost/images/web.Dockerfile apps/web/dist",
         ))
-        .add_step(steps::teardown_nix())
 }
 
 /// The JavaScript services, from the Dockerfiles the local stack uses.
