@@ -80,6 +80,9 @@ Real files live in `.agents/`; tool-specific directories only symlink to it.
 - Answer simple questions directly.
 - For UI work, ask how it should behave on mobile unless that's obvious.
 - Be brief. No justification essays, no time estimates.
+- Write everything that lands in the repository in English: docs, code,
+  comments, file names, commit messages and PR text. Only the conversation may
+  use the user's language.
 
 **Environment**
 
