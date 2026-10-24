@@ -119,7 +119,27 @@ met vertraging; de cron-handler is het vangnet bij fouten en voor berichten die
 verder dan 15 minuten in de toekomst gepland zijn. Zonder die cron blijven zulke
 berichten liggen.
 
-### 5.3 Overige keuzes
+### 5.3 Configuratie: upstream genereren, productie overschrijven
+
+`cargo x validate-local-env --no-doppler --instance selfhost --env-file <override>`
+schrijft de volledige env (185 sleutels) naar
+`infra/local/generated/selfhost/local.generated.env`. De `--env-file`-laag ligt
+boven de gegenereerde waarden. De self-host-configuratie is dus: wat upstream
+genereert, plus één override-bestand met de productiewaarden (domein,
+`LOCAL_AWS_URL` naar de gateway, `KAFKA_BROKERS` naar Redpanda, SMTP, ...).
+Er is geen kopie van `local_env.rs` die kan afdrijven.
+
+**Beveiliging (blokkerend):** de lokale identiteit staat vast in de code
+(`xtask_local/src/local/identity.rs`): de JWT-ondertekensleutel, de
+FusionAuth-API-sleutel, de client-secret, de interne auth-sleutel en het
+sleutelpaar voor API-tokens. Andere geheimen worden afgeleid van de
+instancenaam. Wie de code kent, kan daarmee inlogtokens vervalsen. Een
+render-stap in `infra/selfhost/` vervangt daarom elk geheim door een nieuwe
+willekeurige waarde, op dezelfde manier in de env én in de FusionAuth-kickstart,
+en bewaart ze in het geheimenbestand op de server. Daarnaast toont Caddy van
+FusionAuth alleen de login- en OAuth-paden, nooit `/api` of de admin.
+
+### 5.4 Overige keuzes
 
 - **Images:** `docker/Dockerfile` bouwt per service een release-image. Bouwen
   in GitHub Actions van de fork en pushen naar GHCR; de VPS haalt alleen
@@ -135,7 +155,7 @@ berichten liggen.
   `macro.olivetrees-agency.be`; interne diensten (gateway, Postgres,
   OpenSearch) zonder publieke poort.
 
-### 5.4 Volgorde van bouwen
+### 5.5 Volgorde van bouwen
 
 1. `infra/selfhost/compose.yml` met de infra (Postgres, Redis, OpenSearch,
    Redpanda, FusionAuth, s3proxy, ElasticMQ, DynamoDB Local, local-kms, de
