@@ -205,3 +205,19 @@ fn storage_proxy_rewrite_is_scoped_to_its_origin_and_path() {
         );
     }
 }
+
+#[test]
+fn local_credentials_need_both_values() {
+    let id = || {
+        Some(LocalAwsAccessKeyId::new_testing(
+            "GK0123456789abcdef01234567",
+        ))
+    };
+    let secret = || Some(LocalAwsSecretAccessKey::new_testing("s3cret"));
+    assert!(local_credentials(id(), None).is_none());
+    assert!(local_credentials(None, secret()).is_none());
+
+    let credentials = local_credentials(id(), secret()).expect("both values are set");
+    assert_eq!(credentials.access_key_id(), "GK0123456789abcdef01234567");
+    assert_eq!(credentials.secret_access_key(), "s3cret");
+}

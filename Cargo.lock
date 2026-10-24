@@ -11834,6 +11834,7 @@ name = "macro_aws_config"
 version = "0.1.0"
 dependencies = [
  "aws-config",
+ "aws-credential-types",
  "aws-sdk-s3",
  "aws-sdk-sqs",
  "macro_env_var",

@@ -16,6 +16,15 @@ maybe_env_var! {
     pub struct LocalAwsPublicUrl;
 }
 
+macro_env_var::maybe_env_vars! {
+    /// The access key a self-hosted server signs local AWS requests with.
+    #[derive(Clone)]
+    pub struct LocalAwsAccessKeyId;
+    /// Its secret. It signs presigned storage URLs too, so it must not be public.
+    #[derive(Clone)]
+    pub struct LocalAwsSecretAccessKey;
+}
+
 /// Creates an S3 client
 #[cfg(feature = "s3")]
 pub async fn s3_client() -> aws_sdk_s3::Client {
@@ -48,12 +57,34 @@ pub async fn get_macro_aws_config() -> aws_config::SdkConfig {
 
 /// Creates an AWS SDK config pointed at a LocalStack endpoint.
 pub async fn local_aws_config(local_aws_url: &str) -> aws_config::SdkConfig {
-    aws_config::defaults(aws_config::BehaviorVersion::latest())
+    let loader = aws_config::defaults(aws_config::BehaviorVersion::latest())
         .region("us-east-1")
-        .test_credentials()
-        .endpoint_url(local_aws_url)
-        .load()
-        .await
+        .test_credentials();
+    let loader = match local_credentials(LocalAwsAccessKeyId::new(), LocalAwsSecretAccessKey::new())
+    {
+        Some(credentials) => loader.credentials_provider(credentials),
+        None => loader,
+    };
+    loader.endpoint_url(local_aws_url).load().await
+}
+
+/// The server's own credentials for a local AWS endpoint, when both
+/// `LOCAL_AWS_ACCESS_KEY_ID` and `LOCAL_AWS_SECRET_ACCESS_KEY` are set: a
+/// self-hosted server, whose storage checks signatures. Without them requests
+/// keep the SDK's fixed test credentials, which the local stack's emulators
+/// accept.
+fn local_credentials(
+    access_key_id: Option<LocalAwsAccessKeyId>,
+    secret_access_key: Option<LocalAwsSecretAccessKey>,
+) -> Option<aws_credential_types::Credentials> {
+    let (id, secret) = (access_key_id?, secret_access_key?);
+    Some(aws_credential_types::Credentials::new(
+        id.as_ref(),
+        secret.as_ref(),
+        None,
+        None,
+        "local-aws",
+    ))
 }
 
 /// Returns if the aws config is local or not
