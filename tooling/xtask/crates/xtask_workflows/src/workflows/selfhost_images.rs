@@ -86,7 +86,7 @@ fn cargo_cache(action: &str) -> Step<Use> {
     let step = Step::new(if action == "save" { "Save cargo cache" } else { "Restore cargo cache" })
         .uses(
             "actions",
-            &format!("cache/{action}"),
+            format!("cache/{action}"),
             "5a3ec84eff668545956fd18022155c47e93e2684",
         ) // v4.2.3
         .add_with((

@@ -402,9 +402,12 @@ fn develop_signup_policy_bypass_ignores_allowlist_setting() {
 fn production_signup_policy_ignores_allowlist_and_bypass() {
     for bypass in [false, true] {
         for value in ALLOWLIST_SETTING_CASES {
-            let policy =
-                resolve_signup_policy(Environment::Production, bypass, &development_allowlist(value))
-                    .expect("Production should not parse the allowlist setting");
+            let policy = resolve_signup_policy(
+                Environment::Production,
+                bypass,
+                &development_allowlist(value),
+            )
+            .expect("Production should not parse the allowlist setting");
 
             assert_eq!(policy.allowed_email_count(), None);
             policy
@@ -417,8 +420,9 @@ fn production_signup_policy_ignores_allowlist_and_bypass() {
 #[test]
 fn local_signup_policy_is_open_without_allowlist() {
     for value in [None, Some(""), Some(" \t ")] {
-        let policy = resolve_signup_policy(Environment::Local, false, &development_allowlist(value))
-            .expect("an unset Local allowlist should resolve");
+        let policy =
+            resolve_signup_policy(Environment::Local, false, &development_allowlist(value))
+                .expect("an unset Local allowlist should resolve");
 
         assert_eq!(policy.allowed_email_count(), None);
         assert_eq!(policy.authorize_public_email(UNLISTED_PUBLIC_EMAIL), Ok(()));
