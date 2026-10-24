@@ -20,7 +20,7 @@ Dat is bijna een self-hosted opstelling. Wat het nog geen productie maakt:
 | Onderdeel lokaal | Probleem op een VPS | Oplossing in fase 0 |
 | --- | --- | --- |
 | LocalStack (S3, SQS, DynamoDB, KMS) | Een testtool. Resources en KMS-sleutels verdwijnen bij een herstart, en wat met een verdwenen KMS-sleutel versleuteld is, is onleesbaar (zie `tooling/xtask/crates/xtask_local/src/local/localstack.rs`). | S3 → MinIO of Garage. SQS → ElasticMQ. DynamoDB → DynamoDB Local met een persistent volume. KMS → de lokale sleutelbron uit fase 1 (sectie 3.2), ook voor de bestaande Cursor- en Codex-sleutels. Allemaal API-compatibel, dus alleen andere endpoints in de configuratie. |
-| Kafka in testconfiguratie | Eén broker zonder afgestemde retentie. | Redpanda als één node, met persistent volume en retentie-instellingen. |
+| Kafka in testconfiguratie | Eén broker zonder afgestemde retentie. | Eén Kafka-node (KRaft) met persistent volume en retentie-instellingen; Redpanda als optie om geheugen te sparen. |
 | Mailpit vangt alle mail op | Inlogcodes en uitnodigingen bereiken niemand. | FusionAuth en de notificatieservice versturen via echte SMTP (bijvoorbeeld een Zoho-verzendadres). SES-gebruik gaat naar SMTP of krijgt een SES-compatibele relay. |
 | Gestubde integraties | Google, Stripe, CloudFront werken niet. | Stripe en CloudFront uitgeschakeld laten; Google alleen als je het nodig hebt. |
 | Vaste testgeheimen | Iedereen kent ze. | Alle geheimen nieuw genereren, in één `.env`-bestand buiten de repo (of een secretbeheerder), met rechten 600. |
@@ -61,7 +61,7 @@ helemaal niets bij Cloudflare Tunnel), SSH met sleutel.
 2. Inventaris: elke AWS-, Doppler- en Cloudflare-afhankelijkheid per service,
    vanuit `local_env.rs`, de compose-generator en `infra/stacks/`.
 3. Compose-bestand `infra/selfhost/compose.yml` met MinIO, ElasticMQ, DynamoDB Local,
-   Redpanda, Postgres, Redis, OpenSearch, FusionAuth en de services, plus
+   Kafka, Postgres, Redis, OpenSearch, FusionAuth en de services, plus
    Caddy met Let's Encrypt.
 4. De sync-worker beslissen (zelf hosten of Cloudflare).
 5. E-mailverzending en de beveiliging van het inloggen.
@@ -105,13 +105,13 @@ override van `cargo x` (`tooling/xtask/crates/xtask_local`) draait:
 | --- | --- | --- | --- |
 | Endpoint | alle services via `macro_aws_config` | Eén interne gateway (Caddy) op het adres van `LOCAL_AWS_URL` | De code kent één endpoint voor alle diensten. De gateway routeert op `X-Amz-Target` (`AmazonSQS.*`, `DynamoDB_*`, `TrentService.*`); de rest is S3. Geen code-aanpassing. |
 | S3 | documenten, statische bestanden, bijlagen, uploads | s3proxy met filesystem-backend en `authorization=none` | De code herschrijft presigned URLs naar het publieke adres (`transform_local_url`), waardoor de handtekening niet meer klopt. MinIO en Garage controleren handtekeningen en weigeren zulke URLs; s3proxy kan dat uitzetten. Toegang loopt alleen via de interne gateway en via Caddy-routes met presigned paden. |
-| S3 → SQS-notificatie | `document_upload_finalizer` (ObjectCreated op de document-bucket) | Kleine relay voor het publieke uploadpad: na een geslaagde PUT een S3-event naar ElasticMQ | s3proxy kent geen notificaties. |
+| S3 → SQS-notificatie | `document_upload_finalizer` (ObjectCreated op de document-bucket) | `infra/selfhost/upload-relay/relay.py` vóór s3proxy, voor al het S3-verkeer (gateway en publiek uploadpad): na een geslaagde schrijfactie op `doc-storage` een S3-event naar de finalizer-queue | s3proxy kent geen notificaties. Het event vertrekt vóór het antwoord aan de client. |
 | SQS | bijna alle workers | ElasticMQ met persistente queues (`elasticmq.conf`) | API-compatibel, ook met delay-seconds (verzenden plant met tot 900 s vertraging). |
 | DynamoDB | connection_gateway, document_storage, static_file, agent_harness, search | DynamoDB Local met `-sharedDb -dbPath` op een volume | Officieel image van AWS, persistent. |
 | KMS | authentication_service (Microsoft-, Cursor-sleutels), agent_harness | local-kms (`nsmithuk/local-kms`) met vaste sleutels in een seed-bestand | Sleutels moeten herstarts overleven, anders is versleutelde data onleesbaar. Zoho gebruikt al de lokale sleutelbron uit fase 1. |
 | SES | authentication_service, notification_service | Via SMTP (Zoho-verzendadres) | Nog uit te zoeken: of beide altijd SES gebruiken of een SMTP-pad hebben. |
 | Secrets Manager | bijna alle services | Niet nodig | Lokaal leest `MacroConfig` alles uit de omgeving; per service na te gaan. |
-| Lambda (cron) | `email_scheduled_handler` (herstel en verzending verder dan 15 min), retentie-handlers, `deleted_item_poller`, Gmail-handlers | Het officiële Lambda Runtime Interface Emulator-image per handler, aangeroepen door een cron-container | De binaries gebruiken `lambda_runtime`; de emulator laat ze ongewijzigd draaien. Gmail-handlers zijn niet nodig. |
+| Lambda (cron) | `email_scheduled_handler` (herstel en verzending verder dan 15 min), retentie-handlers, `deleted_item_poller`, Gmail-handlers | Een klok per handler (`infra/selfhost/lambda-clock/clock.py`) die de Lambda Runtime API spreekt en elke interval een EventBridge-event geeft | De binaries gebruiken `lambda_runtime` en draaien ongewijzigd. Een eigen klok in plaats van de Runtime Interface Emulator: geen extra binary, en een trage run slaat tikken over zoals Lambda met concurrency 1. Eerst alleen `email_scheduled_handler`; Gmail-handlers zijn niet nodig. |
 | Lambda (S3-events) | `docx_unzip_handler`, `document_text_extractor`, `image_optimizer`, `convert_service` | Per pipeline uit te zoeken | Deze draaien ook lokaal niet; nagaan welke functies zonder ze ontbreken (Word-import, zoeken in tekst, afbeeldingen). |
 
 Belangrijk voor fase 1: "nu verzenden" zet een bericht direct op de SQS-queue
@@ -126,7 +126,7 @@ schrijft de volledige env (185 sleutels) naar
 `infra/local/generated/selfhost/local.generated.env`. De `--env-file`-laag ligt
 boven de gegenereerde waarden. De self-host-configuratie is dus: wat upstream
 genereert, plus één override-bestand met de productiewaarden (domein,
-`LOCAL_AWS_URL` naar de gateway, `KAFKA_BROKERS` naar Redpanda, SMTP, ...).
+`LOCAL_AWS_URL` naar de gateway, SMTP, ...).
 Er is geen kopie van `local_env.rs` die kan afdrijven.
 
 **Beveiliging (blokkerend):** de lokale identiteit staat vast in de code
@@ -141,10 +141,16 @@ FusionAuth alleen de login- en OAuth-paden, nooit `/api` of de admin.
 
 ### 5.4 Overige keuzes
 
-- **Images:** `docker/Dockerfile` bouwt per service een release-image. Bouwen
-  in GitHub Actions van de fork en pushen naar GHCR; de VPS haalt alleen
-  images op. Niet bouwen op de VPS (geheugen, tijd) en zeker niet op een Pi.
-- **Kafka:** Redpanda als één node, met persistent volume.
+- **Images:** de workflow `selfhost-images` (gegenereerd door
+  `cargo x workflows`, draait alleen in de fork) bouwt op GitHub-runners en
+  pusht naar GHCR, getagd met commit en branch: één `macro-rust`-image met alle
+  Rust-binaries (release, in `rust:1.94.0-trixie`, zonder lokale features),
+  `macro-web` (de bundel) en `macro-sync`, `macro-lexical`,
+  `macro-websocket` uit de Dockerfiles van de lokale stack. De VPS haalt alleen
+  images op. Alleen amd64: een Pi (arm64) vraagt een tweede build.
+- **Kafka:** dezelfde broker als lokaal (`apache/kafka`, KRaft, één node), zodat
+  topics en clientinstellingen identiek blijven. Redpanda kan later geheugen
+  besparen.
 - **Sync-worker:** `wrangler dev` (workerd) met state op een volume, zoals
   lokaal. Voor één gebruiker aanvaardbaar; het risico is dat `wrangler dev`
   geen productieruntime is. Alternatief blijft Cloudflare zelf.
@@ -157,13 +163,43 @@ FusionAuth alleen de login- en OAuth-paden, nooit `/api` of de admin.
 
 ### 5.5 Volgorde van bouwen
 
+Status: 1 tot 3 staan in `infra/selfhost/`; 4 tot 6 volgen.
+
 1. `infra/selfhost/compose.yml` met de infra (Postgres, Redis, OpenSearch,
-   Redpanda, FusionAuth, s3proxy, ElasticMQ, DynamoDB Local, local-kms, de
+   Kafka, FusionAuth, s3proxy, ElasticMQ, DynamoDB Local, local-kms, de
    AWS-gateway) en een provisioning-stap voor queues, buckets, tabellen en
    KMS-sleutels (overgenomen uit `localstack.rs` en `resources.rs`).
 2. De Rust-services en de niet-Rust-services, met de env uit 5.3.
-3. Cron-handlers via de Lambda-emulator; de upload-relay.
+3. Cron-handlers via de Lambda-klok; de upload-relay; migraties (sqlx-cli).
 4. Publieke Caddy, e-mail (SMTP) en het afschermen van signup.
 5. Back-ups en restore; `docs/ota/self-hosting.md`.
 6. Meten op de echte VPS (stap 1 van sectie 3) en de servergrootte vastleggen.
 
+### 5.6 Bevindingen tijdens het bouwen
+
+- **`ENVIRONMENT=local` blijft.** Productie-modus codeert `macro.com` in
+  (redirects, cookie-domein, CORS); lokaal volgt `FRONTEND_ORIGIN` en zet
+  host-only cookies, wat voor één domein klopt. Wat lokaal nog meer doet en
+  in fase 0 afgeschermd moet worden:
+  - signup staat voor iedereen open (`SignupPolicy::allow_all`); Caddy of een
+    allowlist moet dat beperken (stap 4);
+  - webhooks mogen naar `http://`-adressen, ook interne; alleen ingelogde
+    gebruikers maken ze aan;
+  - cookies hebben `SameSite=None` (wel `Secure` en `HttpOnly`).
+- **De inlogcode in het antwoord** hangt aan de compile-feature
+  `return_passwordless_code`, niet aan `ENVIRONMENT`. Het image bouwt zonder die
+  feature en zonder `no_rate_limit`.
+- **De webbundel** is de local-backend-bundel van `cargo x stack up`
+  (`VITE_LOCAL_BACKEND_ORIGIN=same-origin`): alle servicecalls gaan naar het
+  eigen domein, zonder codewijziging. `import.meta.env.DEV` staat daarin aan;
+  dat zet onder meer de automatische login met `?email=` aan, die alleen werkt
+  als de backend de code teruggeeft, wat hij hier niet doet.
+- **Niet in fase 0:** `ai_editing_worker` en `analytics_proxy` (Cloudflare
+  Workers die lokaal de repo mounten); de overige cron- en S3-event-Lambdas.
+- **Back-up:** naast Postgres en de S3-data bevat het volume `sync_state` de
+  live staat van gedeelde documenten.
+- **`agent_harness_service`** krijgt de Docker-socket van de host, zoals
+  lokaal, om sandboxes te starten. Dat is root op de host voor wie die service
+  overneemt.
+- **GHCR:** nieuwe packages zijn privé. Zet ze publiek of log op de server in
+  met een token met `read:packages`.

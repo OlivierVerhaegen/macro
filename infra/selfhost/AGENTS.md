@@ -3,28 +3,44 @@
 ## What it is
 
 Olive Trees fork: Macro on one server without AWS. Docker Compose for the
-infrastructure, with self-hosted replacements for S3, SQS, DynamoDB and KMS
-behind a single AWS endpoint. Design and decisions: `docs/ota/plan-fase-0.md`.
+infrastructure and the services, with self-hosted replacements for S3, SQS,
+DynamoDB, KMS and the scheduled Lambdas behind a single AWS endpoint. Design
+and decisions: `docs/ota/plan-fase-0.md`.
 
 ## How it works
 
 Services know one AWS endpoint, `LOCAL_AWS_URL=http://localstack:4566`. The
 `aws-gateway` container answers on that name and routes by `X-Amz-Target`:
 `AmazonSQS.*` to ElasticMQ, `DynamoDB_20120810.*` to DynamoDB Local,
-`TrentService.*` to local-kms, everything else to s3proxy. Every emulator
-persists to a named volume.
+`TrentService.*` to local-kms, everything else to s3proxy through the upload
+relay. Every emulator persists to a named volume.
+
+The services run from GHCR images built by the `selfhost-images` workflow
+(`tooling/xtask/crates/xtask_workflows/src/workflows/selfhost_images.rs`), pinned
+by `MACRO_VERSION`: one `macro-rust` image for every Rust binary, plus
+`macro-web`, `macro-sync`, `macro-lexical` and `macro-websocket`. A one-shot
+`migrate` service applies the MacroDB migrations before the Rust services start.
+Scheduled Lambda handlers run unchanged against `lambda-clock`, which serves the
+Lambda Runtime API with one EventBridge event per interval. `upload-relay` sits
+in front of s3proxy and sends `doc-storage`'s ObjectCreated events, which
+s3proxy cannot.
 
 ## Start here
 
 - `compose.yml`: the services, their hostnames and volumes.
 - `aws-gateway/Caddyfile`: the AWS routing.
 - `elasticmq/elasticmq.conf`: SQS queue URLs and persistence.
+- `images/`: the image builds. `rust-binaries.txt` lists the Rust binaries;
+  `build-rust.sh` builds them, `publish.sh` pushes an image.
+- `lambda-clock/clock.py`, `upload-relay/relay.py`: the Lambda and S3
+  notification stand-ins, Python standard library only.
 - `render.py`: turns the upstream-generated local env and FusionAuth kickstart
   into the server's configuration (`/etc/macro`), with fresh secrets.
 
 ## Scope
 
-- Owns: the self-hosted runtime (compose, gateway, emulator config).
+- Owns: the self-hosted runtime (compose, gateway, emulator config, images,
+  clock, relay).
 - Not here: the local development stack → `tooling/xtask/crates/xtask_local`;
   AWS deployments → `infra/stacks/`.
 
@@ -36,8 +52,11 @@ persists to a named volume.
 
 ## Checks
 
-- `docker compose -f infra/selfhost/compose.yml --env-file <env> config -q`
+- `MACRO_VERSION=<sha> docker compose -f infra/selfhost/compose.yml --env-file <env> config -q`
 - After changing the gateway: `caddy validate --config infra/selfhost/aws-gateway/Caddyfile --adapter caddyfile`
+- Clock and relay: `python3 -m unittest` in `lambda-clock/` and `upload-relay/`.
+- After changing the workflow module: `cargo x workflows` and
+  `cargo test -p xtask_workflows`.
 
 ## Gotchas
 
@@ -60,3 +79,11 @@ persists to a named volume.
   (run as root) gives it `kickstart/`. The kickstart only applies to an empty
   FusionAuth database, and the container reports healthy before it finishes;
   wait for the API key to answer 200 before calling it.
+- A new Rust service: add its binary to `images/rust-binaries.txt` and a
+  service with its compose name and hyphenated alias to `compose.yml`, copying
+  any `environment:` overrides from `docker/docker-compose.yml`.
+- A new scheduled Lambda: a service running its binary with
+  `AWS_LAMBDA_RUNTIME_API` pointing at its own `lambda-clock` service.
+- The relay sends events only for buckets in its `NOTIFY`; a new bucket
+  notification in `xtask_local`'s `localstack.rs` needs an entry there.
+- The images are amd64 only.

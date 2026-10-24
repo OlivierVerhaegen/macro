@@ -258,6 +258,10 @@ def main() -> None:
     publish(env, conf, state)
     kickstart = render_kickstart(kickstart_path, mapping, env, conf)
 
+    # Compose interpolates `$` in env files, which would silently change a value.
+    dollar = sorted(k for k, v in env.items() if "$" in v)
+    if dollar:
+        fail(f"values must not contain '$': {', '.join(dollar)}")
     write_private(state_path, json.dumps(state, indent=2) + "\n")
     write_private(out / "selfhost.env", "".join(f"{dotenv_line(k, v)}\n" for k, v in sorted(env.items())))
     write_private(out / "kickstart" / "kickstart.json", kickstart, owner=FUSIONAUTH_UID)

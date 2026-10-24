@@ -1,13 +1,17 @@
 # Olive Trees: Macro on one server, without AWS. See docs/ota/plan-fase-0.md.
 #
-# Infrastructure only for now; the services follow. Every container joins the
-# `backend` network under the hostname the generated env (cargo x) expects:
-# postgres, redis, search, kafka, fusionauth and localstack (the AWS gateway).
-# Nothing here publishes a port; the public Caddy (later) is the only entrance.
+# Every container joins the `backend` network under the hostname the generated
+# env (cargo x) expects: postgres, redis, search, kafka, fusionauth, localstack
+# (the AWS gateway) and each service's hyphenated name. Services keep the
+# compose names of docker/docker-compose.yml as their own names, so routes and
+# URLs written for the local stack resolve too. Nothing here publishes a port;
+# the public Caddy (later) is the only entrance.
 #
 # Secrets come from the environment file the render step writes on the server
-# (`--env-file /etc/macro/selfhost.env`); the `:?` guards stop compose when one
-# is missing instead of starting with an empty password.
+# (`--env-file /etc/macro/selfhost.env`, also every service's env_file); the
+# `:?` guards stop compose when one is missing instead of starting with an
+# empty password. Images come from GHCR (the `selfhost-images` workflow),
+# pinned with MACRO_VERSION, a commit SHA.
 name: macro-selfhost
 
 x-defaults: &defaults
@@ -19,6 +23,18 @@ x-defaults: &defaults
       max-file: "3"
   networks:
     - backend
+
+x-env-file: &env-file
+  env_file:
+    - ${MACRO_SELFHOST_DIR:-/etc/macro}/selfhost.env
+
+# One image for every Rust service; each picks its binary.
+x-rust: &rust
+  <<: [*defaults, *env-file]
+  image: ${MACRO_REGISTRY:-ghcr.io/olivierverhaegen}/macro-rust:${MACRO_VERSION:?set to the image commit}
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
 
 services:
   postgres:
@@ -214,6 +230,194 @@ services:
     volumes:
       - s3:/data
 
+  # --- Macro services ---------------------------------------------------------
+  # MacroDB migrations, as the local stack runs them (sqlx-cli). Every Rust
+  # service waits for it; rerun with `up migrate` after an upgrade.
+  migrate:
+    <<: [*defaults, *env-file]
+    image: ${MACRO_REGISTRY:-ghcr.io/olivierverhaegen}/macro-rust:${MACRO_VERSION:?set to the image commit}
+    restart: "no"
+    working_dir: /app
+    command: ["sh", "-c", "/app/out/sqlx database create && /app/out/sqlx migrate run --source /app/migrations"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  authentication-service:
+    <<: *rust
+    command: ["/app/out/authentication_service"]
+  connection_gateway:
+    <<: *rust
+    command: ["/app/out/connection_gateway_service"]
+    networks:
+      backend:
+        aliases:
+          - connection-gateway
+  contacts_service:
+    <<: *rust
+    command: ["/app/out/contacts_service"]
+    networks:
+      backend:
+        aliases:
+          - contacts-service
+  document_storage_service:
+    <<: *rust
+    command: ["/app/out/document_storage_service"]
+    environment:
+      OVERRIDE_SYNC_SERVICE_URL: http://sync-service:8787
+      OVERRIDE_LEXICAL_SERVICE_URL: http://lexical-service:8096
+    networks:
+      backend:
+        aliases:
+          - document-storage-service
+  document_upload_finalizer:
+    <<: *rust
+    command: ["/app/out/document_upload_finalizer_local_worker"]
+  email_service:
+    <<: *rust
+    command: ["/app/out/email_service"]
+    networks:
+      backend:
+        aliases:
+          - email-service
+  email_pubsub_workers:
+    <<: *rust
+    command: ["/app/out/pubsub_workers"]
+  calendar_service:
+    <<: *rust
+    command: ["/app/out/calendar_service"]
+    networks:
+      backend:
+        aliases:
+          - calendar-service
+  notification_service:
+    <<: *rust
+    command: ["/app/out/notification_service"]
+    environment:
+      LAST_ONLINE_REDIS_URI: redis://redis:6379
+      OVERRIDE_CONNECTION_GATEWAY_URL: http://connection-gateway:8080
+    networks:
+      backend:
+        aliases:
+          - notification-service
+  search_processing_service:
+    <<: *rust
+    command: ["/app/out/search_processing_service"]
+    environment:
+      OVERRIDE_LEXICAL_SERVICE_URL: http://lexical-service:8096
+    networks:
+      backend:
+        aliases:
+          - search-processing-service
+  agent_harness_service:
+    <<: *rust
+    command: ["/app/out/agent_harness_service"]
+    environment:
+      OVERRIDE_CONNECTION_GATEWAY_URL: http://connection-gateway:8080
+      OVERRIDE_LEXICAL_SERVICE_URL: http://lexical-service:8096
+      OVERRIDE_SYNC_SERVICE_URL: http://sync-service:8787
+    networks:
+      backend:
+        aliases:
+          - agent-harness-service
+    # Agent sandboxes run as sibling containers on the host's daemon, as in the
+    # local stack. The socket gives this container control of the host's Docker.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+  static_file_service:
+    <<: *rust
+    command: ["/app/out/static_file_service"]
+    networks:
+      backend:
+        aliases:
+          - static-file-service
+  unfurl_service:
+    <<: *rust
+    command: ["/app/out/unfurl_service"]
+    networks:
+      backend:
+        aliases:
+          - unfurl-service
+  image_proxy_service:
+    <<: *rust
+    command: ["/app/out/image_proxy_service"]
+    networks:
+      backend:
+        aliases:
+          - image-proxy-service
+
+  # Scheduled Lambda handlers: the binary runs unchanged against a clock that
+  # serves the Lambda Runtime API (lambda-clock/clock.py) with an EventBridge
+  # event per interval, like the `rate(1 minute)` rule in AWS.
+  email_scheduled_handler:
+    <<: *rust
+    command: ["/app/out/email_scheduled_handler"]
+    environment:
+      AWS_LAMBDA_RUNTIME_API: email-scheduled-clock:9001
+      AWS_LAMBDA_FUNCTION_NAME: email-scheduled-handler
+      AWS_LAMBDA_FUNCTION_MEMORY_SIZE: "256"
+      AWS_LAMBDA_FUNCTION_VERSION: "1"
+
+  email-scheduled-clock:
+    <<: *defaults
+    image: python:3.13-alpine3.22
+    command: ["python", "/clock/clock.py"]
+    environment:
+      FUNCTION_NAME: email-scheduled-handler
+      SCHEDULE_SECONDS: "60"
+    volumes:
+      - ./lambda-clock/clock.py:/clock/clock.py:ro
+
+  # s3proxy sends no bucket notifications; the relay sits in front of it and
+  # sends doc-storage's ObjectCreated events to the upload finalizer's queue.
+  upload-relay:
+    <<: *defaults
+    image: python:3.13-alpine3.22
+    command: ["python", "/relay/relay.py"]
+    environment:
+      S3_UPSTREAM: s3:80
+      NOTIFY: doc-storage=http://localstack:4566/000000000000/document-upload-finalizer-queue
+    volumes:
+      - ./upload-relay/relay.py:/relay/relay.py:ro
+    depends_on:
+      - s3
+
+  sync_service:
+    <<: [*defaults, *env-file]
+    image: ${MACRO_REGISTRY:-ghcr.io/olivierverhaegen}/macro-sync:${MACRO_VERSION:?set to the image commit}
+    environment:
+      DOCUMENT_PERMISSIONS_SECRET: ${DOCUMENT_PERMISSION_JWT:?set in the selfhost env file}
+      DSS_INTERNAL_AUTH_KEY: ${DOCUMENT_STORAGE_SERVICE_AUTH_KEY:?set in the selfhost env file}
+      WRANGLER_SEND_METRICS: "false"
+    networks:
+      backend:
+        aliases:
+          - sync-service
+    volumes:
+      # The collaborative documents' live state (Durable Objects, D1, KV).
+      - sync_state:/app/.wrangler/state
+
+  lexical_service:
+    <<: [*defaults, *env-file]
+    image: ${MACRO_REGISTRY:-ghcr.io/olivierverhaegen}/macro-lexical:${MACRO_VERSION:?set to the image commit}
+    environment:
+      PORT: "8096"
+      INTERNAL_AUTH_KEY: ${INTERNAL_API_SECRET_KEY:?set in the selfhost env file}
+      SYNC_SERVICE_AUTH_KEY: ${INTERNAL_API_SECRET_KEY:?set in the selfhost env file}
+      SYNC_SERVICE_URL: http://sync-service:8787
+    networks:
+      backend:
+        aliases:
+          - lexical-service
+
+  websocket_service:
+    <<: *defaults
+    image: ${MACRO_REGISTRY:-ghcr.io/olivierverhaegen}/macro-websocket:${MACRO_VERSION:?set to the image commit}
+    networks:
+      backend:
+        aliases:
+          - websocket-service
+
 networks:
   backend:
 
@@ -228,3 +432,4 @@ volumes:
   dynamodb:
   kms:
   s3:
+  sync_state:
