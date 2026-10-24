@@ -44,6 +44,7 @@ password, which only it receives (`mailrelay.env`).
 - `proxy/Caddyfile`: the public routes.
 - `render.py`: turns the upstream-generated local env and FusionAuth kickstart
   into the server's configuration (`/etc/macro`), with fresh secrets.
+- `provision.sh`, `backup.sh`, `restore.sh`: first start, back-ups and restore.
 
 ## Scope
 
@@ -54,9 +55,11 @@ password, which only it receives (`mailrelay.env`).
 
 ## Recipes
 
-- Create or restore queues, buckets, tables and KMS keys:
-  `cargo x aws-provision --url http://127.0.0.1:4566` against the gateway
-  (the same provisioning as the local stack's LocalStack).
+- Install, upgrade, back up and restore: `docs/ota/self-hosting.md`.
+- Kafka topics, queues, buckets, tables and KMS keys: `provision.sh`
+  (idempotent; topics from `.github/kafka-cluster-topics.json`, the rest via
+  `cargo x aws-provision` against the gateway on 127.0.0.1:4566).
+- Back up: `backup.sh <dir>`; restore: `restore.sh <backup> [--config]`.
 
 ## Checks
 
@@ -108,3 +111,8 @@ password, which only it receives (`mailrelay.env`).
 - The presigned check is verified against botocore's signer; if the Rust SDK
   starts signing extra headers that browsers do not send, uploads get 403
   with `reason` in the relay log.
+- `backup.sh` stops the services with file-based state (s3, sync, kms,
+  dynamodb, sqs) for the length of the archive copy. A new volume with such
+  state belongs in both scripts' `file_volumes`.
+- `docker compose exec` in a `while read` loop reads the loop's stdin; give it
+  `< /dev/null`.

@@ -5,7 +5,8 @@
 # (the AWS gateway) and each service's hyphenated name. Services keep the
 # compose names of docker/docker-compose.yml as their own names, so routes and
 # URLs written for the local stack resolve too. Only `proxy` (the public Caddy,
-# ports 80 and 443) publishes a port.
+# ports 80 and 443) publishes a public port; the AWS gateway listens on
+# 127.0.0.1:4566 for provisioning.
 #
 # Secrets come from the environment file the render step writes on the server
 # (`--env-file /etc/macro/selfhost.env`, also every service's env_file); the
@@ -177,13 +178,16 @@ services:
       backend:
         aliases:
           - localstack
+    # Loopback only, for provision.sh on the server itself.
+    ports:
+      - "127.0.0.1:4566:4566"
     volumes:
       - ./aws-gateway/Caddyfile:/etc/caddy/Caddyfile:ro
     depends_on:
       - sqs
       - dynamodb
       - kms
-      - s3
+      - upload-relay
 
   sqs:
     <<: *defaults

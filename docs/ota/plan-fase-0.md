@@ -163,7 +163,7 @@ FusionAuth alleen de login- en OAuth-paden, nooit `/api` of de admin.
 
 ### 5.5 Volgorde van bouwen
 
-Status: 1 tot 4 staan in `infra/selfhost/`, lokaal getest maar nog niet op de VPS; 5 en 6 volgen.
+Status: 1 tot 5 staan in `infra/selfhost/` en `docs/ota/self-hosting.md`, lokaal getest maar nog niet op de VPS; 6 volgt.
 
 1. `infra/selfhost/compose.yml` met de infra (Postgres, Redis, OpenSearch,
    Kafka, FusionAuth, s3proxy, ElasticMQ, DynamoDB Local, local-kms, de
