@@ -1,34 +1,36 @@
-# Macro self-hosten op één server
+# Self-hosting Macro on one server
 
-Handleiding voor de Olive Trees-fork: Macro op één VPS, zonder AWS. Het ontwerp
-en de keuzes staan in [plan-fase-0.md](plan-fase-0.md); de technische details
-per bestand in [`infra/selfhost/AGENTS.md`](../../infra/selfhost/AGENTS.md).
+A guide for the Olive Trees fork: Macro on one VPS, without AWS. The design and
+its choices are in [plan-phase-0.md](plan-phase-0.md); the technical details per
+file in [`infra/selfhost/AGENTS.md`](../../infra/selfhost/AGENTS.md).
 
-## Wat je nodig hebt
+## What you need
 
-- Een amd64-server (OVH-VPS) met minstens 24 GB RAM en 100 GB schijf, Debian
-  of Ubuntu, met Docker Engine en de compose-plugin.
-- Een DNS-record `macro.olivetrees-agency.be` naar het IP van de server;
-  poorten 80 en 443 open, al de rest dicht.
-- Op de server: `git`, `python3`, `openssl`, `ssh-keygen` en een Rust-toolchain
-  (`rustup`). De render- en provisioning-stap gebruiken `cargo x` uit de repo.
-- Een Zoho-app-wachtwoord voor SMTP (Zoho Mail → Instellingen → Beveiliging →
-  App-wachtwoorden). Dat vul je alleen op de server in, in `selfhost.conf`.
-- Toegang tot de images: de packages `macro-rust`, `macro-web`, `macro-sync`,
-  `macro-lexical` en `macro-websocket` op GHCR publiek zetten (GitHub →
-  Packages → Package settings), of op de server inloggen met
-  `docker login ghcr.io` en een token met `read:packages`.
+- An amd64 server (OVH VPS) with at least 24 GB of RAM and 100 GB of disk,
+  Debian or Ubuntu, with Docker Engine and the compose plugin.
+- A DNS record `macro.olivetrees-agency.be` pointing at the server's IP; ports
+  80 and 443 open, everything else closed.
+- On the server: `git`, `python3`, `openssl`, `ssh-keygen` and a Rust toolchain
+  (`rustup`). The render and provisioning steps use `cargo x` from the
+  repository.
+- A Zoho app password for SMTP (Zoho Mail → Settings → Security → App
+  passwords). Enter it only on the server, in `selfhost.conf`.
+- Access to the images: make the GHCR packages `macro-rust`, `macro-web`,
+  `macro-sync`, `macro-lexical` and `macro-websocket` public (GitHub → Packages
+  → Package settings), or log in on the server with `docker login ghcr.io` and
+  a token with `read:packages`.
 
 ## Images
 
-De workflow **Self-hosted images** bouwt bij elke push naar `main` of
-`ota/**` alle images en tagt ze met de commit en de branch. Kies de commit
-waarvan de run groen is; dat is `MACRO_VERSION`. Check dezelfde commit uit op
-de server, zodat compose-bestand, scripts en images bij elkaar horen.
+The **Self-hosted images** workflow builds every image on each push to `main`
+or `ota/**` and tags them with the commit and the branch. Pick a commit whose
+run is green; that is `MACRO_VERSION`. Check out the same commit on the server,
+so the compose file, the scripts and the images belong together.
 
-## Eerste installatie
+## First installation
 
-Alles als root, vanuit een checkout van de repo (bijvoorbeeld `/opt/macro`).
+Everything as root, from a checkout of the repository (for example
+`/opt/macro`).
 
 ```sh
 git clone https://github.com/OlivierVerhaegen/macro /opt/macro
@@ -36,93 +38,93 @@ cd /opt/macro && git checkout <MACRO_VERSION>
 
 install -d -m 700 /etc/macro
 install -m 600 infra/selfhost/selfhost.conf.example /etc/macro/selfhost.conf
-# Vul in: domein, signup_allowlist (jouw adres), afzender, het app-wachtwoord.
+# Fill in: domain, signup_allowlist (your address), sender, the app password.
 $EDITOR /etc/macro/selfhost.conf
 
-# Genereert /etc/macro/selfhost.env, mailrelay.env, kickstart/ en secrets.json
-# met nieuwe geheimen voor deze server.
+# Writes /etc/macro/selfhost.env, mailrelay.env, kickstart/ and secrets.json
+# with new secrets for this server.
 python3 infra/selfhost/render.py
 
 export MACRO_VERSION=<commit>
 compose="docker compose -f infra/selfhost/compose.yml --env-file /etc/macro/selfhost.env"
 
-# Eerst de infrastructuur, dan topics, queues, buckets, tabellen en sleutels.
+# The infrastructure first, then topics, queues, buckets, tables and keys.
 $compose up -d --wait postgres redis kafka search fusionauth aws-gateway
 infra/selfhost/provision.sh
 
-# Daarna alles: de migraties lopen eerst, de services wachten erop.
+# Then everything: the migrations run first, the services wait for them.
 $compose up -d
 ```
 
-Open `https://macro.olivetrees-agency.be`, log in met je adres uit
-`signup_allowlist`; de code komt per mail via Zoho.
+Open `https://macro.olivetrees-agency.be` and log in with an address from
+`signup_allowlist`; the code arrives by mail through Zoho.
 
-`secrets.json` bevat alle geheimen van de server. Opnieuw renderen (na een
-wijziging in `selfhost.conf` of een upgrade) houdt ze, dus verlies dat bestand
-niet: het zit in elke back-up.
+`secrets.json` holds every secret of the server. Rendering again (after a change
+to `selfhost.conf` or an upgrade) keeps them, so do not lose that file: every
+backup contains it.
 
-## Upgraden
+## Upgrading
 
 ```sh
-cd /opt/macro && git fetch && git checkout <nieuwe commit>
+cd /opt/macro && git fetch && git checkout <new commit>
 python3 infra/selfhost/render.py
 infra/selfhost/provision.sh
-MACRO_VERSION=<nieuwe commit> docker compose -f infra/selfhost/compose.yml \
+MACRO_VERSION=<new commit> docker compose -f infra/selfhost/compose.yml \
   --env-file /etc/macro/selfhost.env up -d
 ```
 
-`up -d` start `migrate` opnieuw; de services herstarten pas daarna. Maak
-vooraf een back-up.
+`up -d` runs `migrate` again; the services restart only after it. Make a backup
+first.
 
-## Back-ups
+## Backups
 
-`infra/selfhost/backup.sh <map>` schrijft een map per back-up: dumps van
-MacroDB en FusionAuth, archieven van de volumes met bestanden (S3-data, de
-live staat van gedeelde documenten, KMS-sleutels, DynamoDB, queues) en
-`/etc/macro`. Die bestanden-volumes staan daarbij enkele seconden stil. Het
-script bewaart de laatste 14 (`KEEP`).
+`infra/selfhost/backup.sh <dir>` writes one directory per backup: dumps of
+MacroDB and FusionAuth, archives of the volumes with files (S3 data, the live
+state of shared documents, KMS keys, DynamoDB, queues) and `/etc/macro`. The
+services owning those volumes stop for a few seconds meanwhile. The script keeps
+the last 14 (`KEEP`).
 
-Dagelijks, met een kopie buiten de server (bijvoorbeeld OVH Object Storage via
+Daily, with a copy off the server (for example OVH Object Storage through
 `rclone`):
 
 ```cron
 15 3 * * * cd /opt/macro && infra/selfhost/backup.sh /var/backups/macro && rclone sync /var/backups/macro remote:macro-backups
 ```
 
-Een back-up bevat elk geheim van de server; versleutel de kopie buiten de
-server (`rclone crypt`).
+A backup contains every secret of the server; encrypt the copy off the server
+(`rclone crypt`).
 
-Niet in de back-up, want ze worden opnieuw opgebouwd: de zoekindex, Redis,
-Kafka en de TLS-certificaten.
+Not in the backup, because they are rebuilt: the search index, Redis, Kafka and
+the TLS certificates.
 
-## Terugzetten
+## Restoring
 
-Op dezelfde server:
+On the same server:
 
 ```sh
-infra/selfhost/restore.sh /var/backups/macro/<tijdstip>
+infra/selfhost/restore.sh /var/backups/macro/<timestamp>
 MACRO_VERSION=<commit> docker compose -f infra/selfhost/compose.yml \
   --env-file /etc/macro/selfhost.env up -d
 ```
 
-Op een nieuwe server: Docker, de checkout van dezelfde commit, dan
-`restore.sh <map> --config` (zet ook `/etc/macro` terug) en dezelfde `up -d`.
-Daarna `provision.sh` voor de Kafka-topics.
+On a new server: Docker, a checkout of the same commit, then
+`restore.sh <dir> --config` (which also restores `/etc/macro`) and the same
+`up -d`. Then `provision.sh` for the Kafka topics.
 
-## Wat publiek is
+## What is public
 
-Alleen Caddy (`proxy`) op 80 en 443. Daarachter: de app onder `/app`, de
-services onder hun pad, en opslag onder `/local-storage` en `/static-file`,
-waar de upload-relay elke aanvraag zonder geldige presigned handtekening
-weigert. FusionAuth, de databases, de AWS-vervangers en de mailrelay hebben
-geen publieke route. De AWS-gateway luistert op `127.0.0.1:4566` voor
-`provision.sh`.
+Only Caddy (`proxy`) on 80 and 443. Behind it: the app under `/app`, the
+services under their paths, and storage under `/local-storage` and
+`/static-file`, where the upload relay refuses every request without a valid
+presigned signature. FusionAuth, the databases, the AWS replacements and the
+mail relay have no public route. The AWS gateway listens on `127.0.0.1:4566`
+for `provision.sh`.
 
-## Beperkingen nu
+## Current limits
 
-- Alleen amd64; een Raspberry Pi vraagt arm64-images.
-- Niet inbegrepen: de AI-editing-worker, de analytics-proxy en de meeste
-  geplande Lambdas (alleen `email_scheduled_handler` draait).
-- `agent_harness_service` krijgt de Docker-socket van de host, zoals lokaal.
-- Inloggen met Google of Microsoft vraagt een publieke FusionAuth-route; nu
-  alleen inloggen met een code per mail.
+- amd64 only; a Raspberry Pi needs arm64 images.
+- Not included yet: the AI editing worker, the analytics proxy and most
+  scheduled Lambdas (only `email_scheduled_handler` runs).
+- `agent_harness_service` gets the host's Docker socket, as locally.
+- Signing in with Google or Microsoft needs a public FusionAuth route; for now
+  only signing in with an emailed code works.

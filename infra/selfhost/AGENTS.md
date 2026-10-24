@@ -5,7 +5,7 @@
 Olive Trees fork: Macro on one server without AWS. Docker Compose for the
 infrastructure and the services, with self-hosted replacements for S3, SQS,
 DynamoDB, KMS and the scheduled Lambdas behind a single AWS endpoint. Design
-and decisions: `docs/ota/plan-fase-0.md`.
+and decisions: `docs/ota/plan-phase-0.md`.
 
 ## How it works
 

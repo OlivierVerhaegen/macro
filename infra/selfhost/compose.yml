@@ -1,4 +1,4 @@
-# Olive Trees: Macro on one server, without AWS. See docs/ota/plan-fase-0.md.
+# Olive Trees: Macro on one server, without AWS. See docs/ota/plan-phase-0.md.
 #
 # Every container joins the `backend` network under the hostname the generated
 # env (cargo x) expects: postgres, redis, search, kafka, fusionauth, localstack
