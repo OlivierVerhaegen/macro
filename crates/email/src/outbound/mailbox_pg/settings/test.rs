@@ -1,4 +1,5 @@
 use super::*;
+use email_api_client::domain::models::{CategoryMessage, OwnedSenderRule, ProviderId};
 use macro_db_migrator::MACRO_DB_MIGRATIONS;
 
 fn actor() -> MacroUserIdStr<'static> {
@@ -352,5 +353,133 @@ async fn pending_settings_status_tracks_confirmation_and_current_grant(db: PgPoo
         )
         .await
         .is_err()
+    );
+}
+
+/// An IMAP server whose only label support is keywords on messages: any
+/// catalog call fails, and removals are recorded.
+#[derive(Default)]
+struct KeywordServer {
+    removed: std::sync::Arc<std::sync::Mutex<Vec<Vec<String>>>>,
+}
+fn no_catalog() -> EmailApiError {
+    EmailApiError::Permanent {
+        message: "IMAP has no label catalog".into(),
+    }
+}
+impl crate::domain::mailbox::settings::MailboxSettingsGateway for KeywordServer {
+    async fn labels(&self, _: SettingsMailbox) -> Result<Vec<Label>, EmailApiError> {
+        Err(no_catalog())
+    }
+    async fn create_label(&self, _: SettingsMailbox, _: &str) -> Result<Label, EmailApiError> {
+        Err(no_catalog())
+    }
+    async fn delete_label(&self, _: SettingsMailbox, _: &str) -> Result<(), EmailApiError> {
+        Ok(())
+    }
+    async fn category_messages(
+        &self,
+        _: SettingsMailbox,
+        name: &str,
+    ) -> Result<Vec<CategoryMessage>, EmailApiError> {
+        Ok(if self.removed.lock().unwrap().is_empty() {
+            vec![CategoryMessage {
+                id: ProviderId::new("[1,7,\"INBOX\"]").unwrap(),
+                categories: vec![name.to_owned(), "Other".to_owned()],
+                version: Some("9".to_owned()),
+            }]
+        } else {
+            Vec::new()
+        })
+    }
+    async fn remove_category(
+        &self,
+        _: SettingsMailbox,
+        _: &CategoryMessage,
+        remaining: Vec<String>,
+    ) -> Result<(), EmailApiError> {
+        self.removed.lock().unwrap().push(remaining);
+        Ok(())
+    }
+    async fn sender_rules(
+        &self,
+        _: SettingsMailbox,
+    ) -> Result<Vec<OwnedSenderRule>, EmailApiError> {
+        Err(no_catalog())
+    }
+    async fn create_sender_rule(
+        &self,
+        _: SettingsMailbox,
+        _: Uuid,
+        _: &str,
+    ) -> Result<(), EmailApiError> {
+        Err(no_catalog())
+    }
+    async fn remove_sender_rule(
+        &self,
+        _: SettingsMailbox,
+        _: &ProviderId,
+    ) -> Result<(), EmailApiError> {
+        Err(no_catalog())
+    }
+    async fn gmail_blocked(&self, _: SettingsMailbox) -> Result<Vec<String>, EmailApiError> {
+        Err(no_catalog())
+    }
+    async fn gmail_set_block(
+        &self,
+        _: SettingsMailbox,
+        _: &str,
+        _: bool,
+    ) -> Result<(), EmailApiError> {
+        Err(no_catalog())
+    }
+}
+
+#[sqlx::test(migrator = "MACRO_DB_MIGRATIONS")]
+async fn imap_labels_are_keywords_created_locally_and_removed_from_messages(db: PgPool) {
+    let (repo, link) = super::super::test::fixture(&db).await;
+    sqlx::query!(
+        "UPDATE email_links SET provider = 'IMAP' WHERE id = $1",
+        link
+    )
+    .execute(&db)
+    .await
+    .unwrap();
+    let server = KeywordServer::default();
+    let removed = server.removed.clone();
+    let service =
+        crate::domain::mailbox::settings::MailboxSettingsService::new(repo.clone(), server);
+
+    assert!(matches!(
+        service.create_label(&actor(), link, "Klant A").await,
+        Err(MailboxError::InvalidInput(_))
+    ));
+    let label = service
+        .create_label(&actor(), link, "Klant-A")
+        .await
+        .unwrap();
+    assert_eq!(label.provider_label_id, "Klant-A");
+    assert!(
+        repo.claim_settings(Uuid::now_v7(), true, true)
+            .await
+            .unwrap()
+            .is_none(),
+        "a keyword needs no remote creation"
+    );
+
+    service
+        .delete_label(&actor(), link, label.id.unwrap())
+        .await
+        .unwrap();
+    // The first pass strips the keyword from its message, the second finishes.
+    assert!(service.execute_once().await.unwrap());
+    assert!(service.execute_once().await.unwrap());
+    assert_eq!(*removed.lock().unwrap(), [vec!["Other".to_owned()]]);
+    assert!(
+        sqlx::query!("SELECT id FROM email_labels WHERE id=$1", label.id.unwrap())
+            .fetch_optional(&db)
+            .await
+            .unwrap()
+            .is_none()
     );
 }

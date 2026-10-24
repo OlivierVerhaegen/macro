@@ -20,6 +20,7 @@ use zeroize::Zeroizing;
 
 mod credentials;
 mod idle;
+mod labels;
 mod send;
 mod signature;
 pub mod smtp;

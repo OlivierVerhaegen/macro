@@ -306,6 +306,10 @@ pub async fn run() -> anyhow::Result<()> {
                 crate::outbound::mailbox_settings::ProviderMailboxSettings {
                     gmail: email_api.clone(),
                     outlook: outlook_api.clone(),
+                    imap: crate::composition::imap_gateway(
+                        db.clone(),
+                        auth_service_client.as_ref().clone(),
+                    ),
                 },
             ),
         ),

@@ -214,9 +214,17 @@ impl<R: MailboxSettingsRepository, G: MailboxSettingsGateway> MailboxSettingsSer
                     .await;
             }
             UserProvider::Imap => {
-                return Err(MailboxError::InvalidInput(
-                    "labels are not available for IMAP mailboxes yet",
-                ));
+                // Labels are message keywords, which sync reads back as the
+                // label's name, so the name must itself be a keyword.
+                if !is_imap_keyword(name) {
+                    return Err(MailboxError::InvalidInput(
+                        "IMAP labels use letters, digits and punctuation, without spaces",
+                    ));
+                }
+                return self
+                    .repository
+                    .store_label(actor, mailbox, keyword_label(mailbox, name))
+                    .await;
             }
             UserProvider::Gmail => {}
         }
@@ -356,7 +364,10 @@ impl<R: MailboxSettingsRepository, G: MailboxSettingsGateway> MailboxSettingsSer
                 self.repository.commit_created_label(lease, label).await
             }
             "delete_label" => {
-                if lease.mailbox.provider == UserProvider::Outlook {
+                if matches!(
+                    lease.mailbox.provider,
+                    UserProvider::Outlook | UserProvider::Imap
+                ) {
                     let messages = self
                         .gateway
                         .category_messages(lease.mailbox, &lease.resource)
@@ -425,5 +436,28 @@ impl<R: MailboxSettingsRepository, G: MailboxSettingsGateway> MailboxSettingsSer
             }
             _ => Err(MailboxError::Persistence),
         }
+    }
+}
+
+/// An IMAP keyword: printable ASCII without atom specials. Keywords starting
+/// with `$` are server and client conventions, not user labels.
+fn is_imap_keyword(name: &str) -> bool {
+    !name.is_empty()
+        && !name.starts_with(['$', '\\'])
+        && name
+            .chars()
+            .all(|c| c.is_ascii_graphic() && !"(){%*\"\\]".contains(c))
+}
+
+fn keyword_label(mailbox: SettingsMailbox, name: &str) -> Label {
+    Label {
+        id: None,
+        link_id: mailbox.key.link_id,
+        provider_label_id: name.to_owned(),
+        name: Some(name.to_owned()),
+        created_at: chrono::Utc::now(),
+        message_list_visibility: None,
+        label_list_visibility: None,
+        type_: Some(models_email::service::label::LabelType::User),
     }
 }

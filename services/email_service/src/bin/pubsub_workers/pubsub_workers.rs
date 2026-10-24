@@ -471,6 +471,7 @@ async fn main() -> anyhow::Result<()> {
             email_service::outbound::mailbox_settings::ProviderMailboxSettings {
                 gmail: email_api_live.clone(),
                 outlook: outlook_api.clone(),
+                imap: imap_gateway.clone(),
             },
         )
         .with_outlook_runtime(config.outlook_sync_enabled, config.outlook_writes_enabled),

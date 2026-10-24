@@ -187,7 +187,7 @@ ik uit de `LIST`-uitvoer.
 | Verplaatsen, archiveren, prullenbak | `UID MOVE` (of COPY+EXPUNGE) naar de map met de juiste rol |
 | Concept opslaan | Besloten: concepten blijven in Macro en gaan niet naar de map Concept van Zoho |
 | Verzenden | SMTP (`smtp.zoho.eu:465`, app-wachtwoord); daarna wordt de kopie in Verzonden op Message-ID gezocht, en anders zelf met `APPEND` gearchiveerd |
-| Labels/tags | Via de Zoho API als labels geen IMAP-keywords zijn; anders keywords |
+| Labels/tags | Gebouwd: IMAP-keywords (Zoho bewaart eigen keywords). Labelnamen mogen geen spaties of `( ) { % * " \ ]` bevatten. Zoho's eigen webmail-labels zijn iets anders en worden niet gesynchroniseerd. |
 
 Verzenden volgt de bestaande `SubmissionOutcome`-regels: een time-out na het
 SMTP-`DATA`-commando geeft `Unknown`, nooit een blinde herhaling. Het
@@ -265,7 +265,7 @@ ik niet toe: koppelen vraagt een browser-OAuth en een geheim.
 4. IMAP-gateway en workers in `email_service`, provider-parameter in de
    claim-queries, `sqlx::test` voor de claims.
 5. Schrijfpad: commands, concepten, SMTP-verzending.
-6. `zoho_client`: accounts, aliassen, handtekeningen (gebouwd: "Import from Zoho"), labels (open: wacht op de `PERMANENTFLAGS`-test).
+6. `zoho_client`: accounts, aliassen, handtekeningen (gebouwd: "Import from Zoho"), labels (gebouwd: als IMAP-keywords, want Zoho geeft `PERMANENTFLAGS (\*)`; namen zonder spaties).
 7. Route `POST /email/links/imap`, OpenAPI, SDK-coverage, frontenddialoog.
 8. IDLE-worker.
 9. Docs: `AGENTS.md` van de geraakte mappen, `docs/ota/self-hosting.md`, agent

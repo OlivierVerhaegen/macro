@@ -270,6 +270,51 @@ async fn organization_follows_flags_and_archive_folders_are_created_once() {
 }
 
 #[tokio::test]
+async fn labels_are_keywords_found_by_search_and_removed_again() {
+    let Some(test) = test_server() else { return };
+    let mut connection = connect(&test, &user()).await;
+    let folders = connection.folders().await.unwrap();
+    let id = connection
+        .append("INBOX", &[], &message("<label@example.com>", None))
+        .await
+        .unwrap()
+        .expect("the appended message is found by Message-ID");
+
+    assert!(
+        connection
+            .set_keywords(&id, &[], &["Klant-A".to_owned()])
+            .await
+            .unwrap()
+    );
+    assert_eq!(
+        connection.with_keyword("INBOX", "Klant-A").await.unwrap(),
+        [id.clone()]
+    );
+    let tagged = connection
+        .organization(&id, &folders)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(tagged.tags, ["Klant-A"]);
+    assert!(connection.with_keyword("INBOX", "Klant A").await.is_err());
+
+    assert!(
+        connection
+            .set_keywords(&id, &tagged.tags, &[])
+            .await
+            .unwrap()
+    );
+    assert!(
+        connection
+            .with_keyword("INBOX", "Klant-A")
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    connection.delete(&id).await.unwrap();
+}
+
+#[tokio::test]
 async fn idle_reports_a_new_message_and_times_out_quietly() {
     let Some(test) = test_server() else { return };
     let user = user();

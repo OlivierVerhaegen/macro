@@ -33,3 +33,5 @@ session that answers in the provider-neutral mailbox vocabulary of
 - Threads key on the first `References` id, else `In-Reply-To`, else the
   message's own `Message-ID`; keep that stable or threads split.
 - Attachment ids are IMAP part paths (`2`, `1.2`) into the raw message.
+- Labels are keywords (Zoho keeps any: `PERMANENTFLAGS (\*)`); keywords are
+  ASCII atoms, so names with spaces or `( ) { % * " \ ]` are refused.

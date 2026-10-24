@@ -207,6 +207,32 @@ impl ImapConnection {
             .map(|value| value.trim().to_owned()))
     }
 
+    /// Every message in `folder` that carries `keyword`.
+    #[tracing::instrument(name = "imap.search_keyword", skip_all, err)]
+    pub async fn with_keyword(
+        &mut self,
+        folder: &str,
+        keyword: &str,
+    ) -> Result<Vec<ImapMessageId>, ImapError> {
+        let keyword = keyword_atom(keyword)?;
+        let selected = self.select_folder(folder).await?;
+        let mut uids = self
+            .session
+            .uid_search(format!("KEYWORD {keyword}"))
+            .await?
+            .into_iter()
+            .collect::<Vec<_>>();
+        uids.sort_unstable();
+        Ok(uids
+            .into_iter()
+            .map(|uid| ImapMessageId {
+                uid_validity: selected.uid_validity,
+                uid,
+                folder: folder.to_owned(),
+            })
+            .collect())
+    }
+
     /// The newest message in `folder` with this Message-ID (`<...>`).
     #[tracing::instrument(name = "imap.find_message", skip_all, err)]
     pub async fn find(
@@ -230,13 +256,13 @@ impl ImapConnection {
     }
 }
 
-/// IMAP keywords are atoms: no spaces, parentheses, quotes or wildcards.
+/// IMAP keywords are ASCII atoms: no spaces, parentheses, quotes or wildcards.
 fn keyword_atom(keyword: &str) -> Result<&str, ImapError> {
     if keyword.is_empty()
         || keyword.starts_with('\\')
         || keyword
             .chars()
-            .any(|c| c.is_control() || " (){%*\"\\]".contains(c))
+            .any(|c| !c.is_ascii_graphic() || "(){%*\"\\]".contains(c))
     {
         return Err(ImapError::Protocol(format!(
             "the label cannot be stored as an IMAP keyword: {keyword}"

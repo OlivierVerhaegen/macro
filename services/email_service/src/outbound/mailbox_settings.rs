@@ -1,3 +1,4 @@
+use email::domain::mailbox::commands::MailboxCommandGateway;
 use email::domain::mailbox::settings::*;
 use email_api_client::domain::{models::*, ports::*, service::mailbox::MailboxApiService};
 use models_email::service::{label::Label, link::UserProvider};
@@ -6,6 +7,7 @@ use uuid::Uuid;
 pub struct ProviderMailboxSettings<R, T, L> {
     pub gmail: super::email_api::GmailApi,
     pub outlook: MailboxApiService<R, T, L>,
+    pub imap: crate::composition::ImapGateway,
 }
 fn access(mailbox: SettingsMailbox) -> MailboxAccess {
     MailboxAccess {
@@ -46,7 +48,8 @@ where
         match mailbox.provider {
             UserProvider::Gmail => self.gmail.delete_label(mailbox.key.link_id, name).await,
             UserProvider::Outlook => self.outlook.delete_label(access(mailbox), name).await,
-            UserProvider::Imap => Err(imap_unsupported()),
+            // A keyword exists only on messages; removing it from them is the deletion.
+            UserProvider::Imap => Ok(()),
         }
     }
     async fn category_messages(
@@ -54,7 +57,12 @@ where
         mailbox: SettingsMailbox,
         name: &str,
     ) -> Result<Vec<CategoryMessage>, EmailApiError> {
-        self.outlook.category_messages(access(mailbox), name).await
+        match mailbox.provider {
+            UserProvider::Imap => self.imap.keyword_messages(mailbox.key, name).await,
+            UserProvider::Gmail | UserProvider::Outlook => {
+                self.outlook.category_messages(access(mailbox), name).await
+            }
+        }
     }
     async fn remove_category(
         &self,
@@ -62,15 +70,19 @@ where
         message: &CategoryMessage,
         remaining: Vec<String>,
     ) -> Result<(), EmailApiError> {
-        self.outlook
-            .apply(
-                access(mailbox),
-                &message.id,
-                &MessageAction::SetTags(remaining),
-                message.version.as_deref(),
-            )
-            .await
-            .map(|_| ())
+        let action = MessageAction::SetTags(remaining);
+        match mailbox.provider {
+            UserProvider::Imap => self
+                .imap
+                .apply(mailbox.key, &message.id, &action, message.version.as_deref())
+                .await
+                .map(|_| ()),
+            UserProvider::Gmail | UserProvider::Outlook => self
+                .outlook
+                .apply(access(mailbox), &message.id, &action, message.version.as_deref())
+                .await
+                .map(|_| ()),
+        }
     }
     async fn sender_rules(
         &self,
@@ -113,8 +125,8 @@ where
     }
 }
 
-/// Label management for IMAP mailboxes needs the Zoho Mail API; until then
-/// the settings worker records a permanent failure instead of retrying.
+/// IMAP has no label catalog: its labels are created in Macro and live on
+/// messages as keywords, so a catalog read or remote creation is a bug.
 fn imap_unsupported() -> EmailApiError {
     EmailApiError::Permanent {
         message: "labels are not available for IMAP mailboxes yet".into(),

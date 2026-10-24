@@ -81,6 +81,8 @@ the gateway `/email` prefix.
   `POST /email/settings/import-signature` reads Zoho Mail signatures for IMAP
   inboxes (`imap_mailbox/signature.rs`), and Zoho logs in with the grant's
   `mailbox_address`, which can differ from the primary (alias) address.
+  Label deletion on IMAP inboxes strips the keyword from messages through
+  `imap_mailbox/labels.rs`; `ProviderMailboxSettings` holds the IMAP gateway.
 - Header addresses that Gmail accepts can fail `MacroUserIdStr::try_from_email`.
   Skip the bad address with a WARN that omits it (the parse error echoes it)
   instead of failing the step; see `pubsub::util::build_contact_connections`.
