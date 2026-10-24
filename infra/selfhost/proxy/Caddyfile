@@ -1,0 +1,111 @@
+# The public entrance: one origin for the web app and every service, with a
+# Let's Encrypt certificate. Routes mirror the local stack's single-origin proxy
+# (tooling/xtask/crates/xtask_local/src/local/proxy.rs; test_routes.py checks
+# that every prefix there is handled or listed as not deployed), except:
+# - no CORS overlay: the app and the services share this origin;
+# - storage goes to the upload relay's public port, which checks presigned
+#   signatures, never straight to s3proxy;
+# - static-file's /internal API, FusionAuth, the emulators and Mailpit are not
+#   reachable from outside.
+{
+	email {$ACME_EMAIL}
+	admin off
+}
+
+{$MACRO_DOMAIN} {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=31536000"
+
+	# Rust services; HTTP prefixes are stripped, as locally.
+	handle_path /auth/* {
+		reverse_proxy authentication-service:8080
+	}
+	@connection_gateway path /connection-gateway /connection-gateway/*
+	handle @connection_gateway {
+		uri strip_prefix /connection-gateway
+		reverse_proxy connection_gateway:8080
+	}
+	handle_path /contacts/* {
+		reverse_proxy contacts_service:8080
+	}
+	handle_path /dss/* {
+		reverse_proxy document_storage_service:8080
+	}
+	handle_path /email/* {
+		reverse_proxy email_service:8080
+	}
+	handle_path /calendar/* {
+		reverse_proxy calendar_service:8080
+	}
+	handle_path /notification/* {
+		reverse_proxy notification_service:8080
+	}
+	handle_path /unfurl/* {
+		reverse_proxy unfurl_service:8080
+	}
+	handle_path /image-proxy/* {
+		reverse_proxy image_proxy_service:8080
+	}
+	handle_path /agent-harness/* {
+		reverse_proxy agent_harness_service:8080
+	}
+	# The agent harness mounts these itself, so the prefix stays.
+	@agent_harness path /preview /preview/* /scheduled-action /scheduled-action/* /cognition /cognition/* /mcp /mcp/*
+	handle @agent_harness {
+		reverse_proxy agent_harness_service:8080
+	}
+
+	# JavaScript services. Sync rejects origins it does not know, as locally.
+	@websocket path /websocket /websocket/*
+	handle @websocket {
+		uri strip_prefix /websocket
+		reverse_proxy websocket-service:6969
+	}
+	@sync path /sync /sync/*
+	handle @sync {
+		uri strip_prefix /sync
+		reverse_proxy sync-service:8787 {
+			header_up Origin http://localhost:3000
+		}
+	}
+	handle_path /lexical/* {
+		reverse_proxy lexical-service:8096
+	}
+	# Not deployed in phase 0: the analytics proxy (the bundle sends nothing
+	# without its keys) and the AI editing worker.
+	handle /i/* {
+		respond 204
+	}
+	handle /ai-editing/* {
+		respond 503
+	}
+
+	# Storage: presigned URLs point at /local-storage; static files are the
+	# public static-file bucket, with the service's API next to it.
+	handle_path /local-storage/* {
+		reverse_proxy upload-relay:8081
+	}
+	handle_path /static-file/* {
+		route {
+			@svc path /api/*
+			reverse_proxy @svc static-file-service:8080
+			@internal path /internal/*
+			respond @internal 404
+			rewrite * /static-file-storage{uri}
+			reverse_proxy upload-relay:8081
+		}
+	}
+
+	# The web app: the bundle in this image, under /app with SPA fallback.
+	redir / "/app/?{query}" 302
+	redir /app /app/ 308
+	handle_path /app/* {
+		root * /srv/frontend
+		try_files {path} /index.html
+		file_server
+	}
+
+	handle {
+		respond 404
+	}
+}

@@ -13,7 +13,8 @@ local addresses. This script turns them into a configuration for one server:
 * the kickstart gets the same secrets, redirect URLs and mail settings.
 
 Secrets are kept in `<dir>/secrets.json`, so rendering again keeps them; the
-outputs are `<dir>/selfhost.env` and `<dir>/kickstart/kickstart.json`, all
+outputs are `<dir>/selfhost.env`, `<dir>/mailrelay.env` (the SMTP relay's app
+password, read by that container only) and `<dir>/kickstart/kickstart.json`, all
 mode 600; the kickstart belongs to FusionAuth's container user, which must read
 it. Nothing secret is written inside the repository.
 
@@ -184,6 +185,9 @@ def publish(env: dict[str, str], conf: configparser.ConfigParser, state: dict) -
         {
             # The generator's fixed internal hosts stay; only the public ones move.
             "FUSIONAUTH_PUBLIC_URL": public,
+            # The public Caddy's site and its Let's Encrypt account.
+            "MACRO_DOMAIN": domain,
+            "ACME_EMAIL": conf.get("server", "acme_email", fallback=conf["mail"]["from"]),
             "EMAIL_SERVICE_CLOUDFRONT_DISTRIBUTION_URL": f"{public}/static-file",
             "PIPEDREAM_ALLOWED_ORIGINS": public,
             "SENDER_BASE_ADDRESS": conf["mail"]["sender_domain"],
@@ -199,6 +203,22 @@ def publish(env: dict[str, str], conf: configparser.ConfigParser, state: dict) -
     )
     for key, value in conf["env"].items() if conf.has_section("env") else []:
         env[key.upper()] = value
+
+
+def mailrelay_env(conf: configparser.ConfigParser) -> str:
+    """The relay's own env: the app password stays out of the services' env."""
+    relay = conf["relay"]
+    if not relay.get("password") or relay["password"].startswith("REPLACE_WITH"):
+        fail("[relay] password must be the Zoho app password")
+    values = {
+        "UPSTREAM_HOST": relay["host"],
+        "UPSTREAM_PORT": relay.get("port", "587"),
+        "UPSTREAM_USERNAME": relay["username"],
+        "UPSTREAM_PASSWORD": relay["password"],
+    }
+    if any("$" in value for value in values.values()):
+        fail("[relay] values must not contain '$'")
+    return "".join(f"{dotenv_line(k, v)}\n" for k, v in values.items())
 
 
 def signup_allowlist(conf: configparser.ConfigParser) -> list[str]:
@@ -275,8 +295,9 @@ def main() -> None:
         fail(f"values must not contain '$': {', '.join(dollar)}")
     write_private(state_path, json.dumps(state, indent=2) + "\n")
     write_private(out / "selfhost.env", "".join(f"{dotenv_line(k, v)}\n" for k, v in sorted(env.items())))
+    write_private(out / "mailrelay.env", mailrelay_env(conf))
     write_private(out / "kickstart" / "kickstart.json", kickstart, owner=FUSIONAUTH_UID)
-    print(f"render: wrote {out / 'selfhost.env'} and {out / 'kickstart/kickstart.json'}")
+    print(f"render: wrote selfhost.env, mailrelay.env and kickstart/kickstart.json in {out}")
 
 
 if __name__ == "__main__":

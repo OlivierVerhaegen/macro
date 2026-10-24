@@ -163,7 +163,7 @@ FusionAuth alleen de login- en OAuth-paden, nooit `/api` of de admin.
 
 ### 5.5 Volgorde van bouwen
 
-Status: 1 tot 3 staan in `infra/selfhost/`; 4 tot 6 volgen.
+Status: 1 tot 4 staan in `infra/selfhost/`, lokaal getest maar nog niet op de VPS; 5 en 6 volgen.
 
 1. `infra/selfhost/compose.yml` met de infra (Postgres, Redis, OpenSearch,
    Kafka, FusionAuth, s3proxy, ElasticMQ, DynamoDB Local, local-kms, de
@@ -181,8 +181,10 @@ Status: 1 tot 3 staan in `infra/selfhost/`; 4 tot 6 volgen.
   (redirects, cookie-domein, CORS); lokaal volgt `FRONTEND_ORIGIN` en zet
   host-only cookies, wat voor één domein klopt. Wat lokaal nog meer doet en
   in fase 0 afgeschermd moet worden:
-  - signup staat voor iedereen open (`SignupPolicy::allow_all`); Caddy of een
-    allowlist moet dat beperken (stap 4);
+  - signup stond voor iedereen open (`SignupPolicy::allow_all`). Opgelost met
+    een kleine upstream-wijziging: onder Local geldt
+    `DEVELOPMENT_SIGNUP_ALLOWLIST_JSON` als die gezet is; `render.py` eist
+    `[server] signup_allowlist`. Macro laat `@macro.com`-adressen altijd toe;
   - webhooks mogen naar `http://`-adressen, ook interne; alleen ingelogde
     gebruikers maken ze aan;
   - cookies hebben `SameSite=None` (wel `Secure` en `HttpOnly`).
@@ -203,3 +205,12 @@ Status: 1 tot 3 staan in `infra/selfhost/`; 4 tot 6 volgen.
   overneemt.
 - **GHCR:** nieuwe packages zijn privé. Zet ze publiek of log op de server in
   met een token met `read:packages`.
+- **Opslag was publiek:** s3proxy controleert geen handtekeningen, dus een
+  publieke `/local-storage`-route gaf iedereen toegang tot elke bucket. De
+  upload-relay controleert op de publieke poort de presigned SigV4-handtekening
+  met een eigen AWS-secret per server; alleen leesacties op de
+  static-file-bucket zijn vrij, zoals een CDN.
+- **E-mail:** `mailrelay` (eigen, Python standaardbibliotheek) in plaats van
+  een Postfix-image: geen wachtrij, een fout bij Zoho gaat terug naar de
+  verzendende service. Het app-wachtwoord staat in een apart env-bestand.
+

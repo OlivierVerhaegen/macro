@@ -4,8 +4,8 @@
 # env (cargo x) expects: postgres, redis, search, kafka, fusionauth, localstack
 # (the AWS gateway) and each service's hyphenated name. Services keep the
 # compose names of docker/docker-compose.yml as their own names, so routes and
-# URLs written for the local stack resolve too. Nothing here publishes a port;
-# the public Caddy (later) is the only entrance.
+# URLs written for the local stack resolve too. Only `proxy` (the public Caddy,
+# ports 80 and 443) publishes a port.
 #
 # Secrets come from the environment file the render step writes on the server
 # (`--env-file /etc/macro/selfhost.env`, also every service's env_file); the
@@ -374,15 +374,15 @@ services:
   # Caddy) it lets through only presigned requests signed with the services'
   # AWS secret, plus reads of the static-file bucket.
   upload-relay:
-    <<: *defaults
+    # The AWS key comes from the env file, not interpolation: a shell's own
+    # AWS_* variables would win there.
+    <<: [*defaults, *env-file]
     image: python:3.13-alpine3.22
     command: ["python", "/relay/relay.py"]
     environment:
       S3_UPSTREAM: s3:80
       NOTIFY: doc-storage=http://localstack:4566/000000000000/document-upload-finalizer-queue
       PUBLIC_READ: static-file-storage
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?set in the selfhost env file}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?set in the selfhost env file}
     volumes:
       - ./upload-relay/relay.py:/relay/relay.py:ro
     depends_on:
@@ -416,6 +416,35 @@ services:
         aliases:
           - lexical-service
 
+  # Plain SMTP from the services and FusionAuth, delivered to Zoho over
+  # STARTTLS with the app password (mailrelay/mailrelay.py). Its env file holds
+  # only that password, so the services never see it.
+  mailrelay:
+    <<: *defaults
+    image: python:3.13-alpine3.22
+    command: ["python", "/mailrelay/mailrelay.py"]
+    env_file:
+      - ${MACRO_SELFHOST_DIR:-/etc/macro}/mailrelay.env
+    volumes:
+      - ./mailrelay/mailrelay.py:/mailrelay/mailrelay.py:ro
+
+  # The public entrance: the web bundle's Caddy image with proxy/Caddyfile and
+  # a Let's Encrypt certificate for MACRO_DOMAIN.
+  proxy:
+    <<: *defaults
+    image: ${MACRO_REGISTRY:-ghcr.io/olivierverhaegen}/macro-web:${MACRO_VERSION:?set to the image commit}
+    environment:
+      MACRO_DOMAIN: ${MACRO_DOMAIN:?set in the selfhost env file}
+      ACME_EMAIL: ${ACME_EMAIL:?set in the selfhost env file}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
   websocket_service:
     <<: *defaults
     image: ${MACRO_REGISTRY:-ghcr.io/olivierverhaegen}/macro-websocket:${MACRO_VERSION:?set to the image commit}
@@ -439,3 +468,5 @@ volumes:
   kms:
   s3:
   sync_state:
+  caddy_data:
+  caddy_config:

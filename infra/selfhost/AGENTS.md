@@ -23,7 +23,13 @@ by `MACRO_VERSION`: one `macro-rust` image for every Rust binary, plus
 Scheduled Lambda handlers run unchanged against `lambda-clock`, which serves the
 Lambda Runtime API with one EventBridge event per interval. `upload-relay` sits
 in front of s3proxy and sends `doc-storage`'s ObjectCreated events, which
-s3proxy cannot.
+s3proxy cannot; on its public port it admits only presigned requests signed with
+the services' AWS secret.
+
+`proxy` (the `macro-web` image: Caddy with the bundle) is the only public
+entrance, with the routes of the local stack's proxy. `mailrelay` takes plain
+SMTP from the services and FusionAuth and delivers it to Zoho with the app
+password, which only it receives (`mailrelay.env`).
 
 ## Start here
 
@@ -32,8 +38,10 @@ s3proxy cannot.
 - `elasticmq/elasticmq.conf`: SQS queue URLs and persistence.
 - `images/`: the image builds. `rust-binaries.txt` lists the Rust binaries;
   `build-rust.sh` builds them, `publish.sh` pushes an image.
-- `lambda-clock/clock.py`, `upload-relay/relay.py`: the Lambda and S3
-  notification stand-ins, Python standard library only.
+- `lambda-clock/clock.py`, `upload-relay/relay.py`, `mailrelay/mailrelay.py`:
+  the Lambda, S3 notification/signature and SMTP stand-ins, Python standard
+  library only.
+- `proxy/Caddyfile`: the public routes.
 - `render.py`: turns the upstream-generated local env and FusionAuth kickstart
   into the server's configuration (`/etc/macro`), with fresh secrets.
 
@@ -54,7 +62,10 @@ s3proxy cannot.
 
 - `MACRO_VERSION=<sha> docker compose -f infra/selfhost/compose.yml --env-file <env> config -q`
 - After changing the gateway: `caddy validate --config infra/selfhost/aws-gateway/Caddyfile --adapter caddyfile`
-- Clock and relay: `python3 -m unittest` in `lambda-clock/` and `upload-relay/`.
+- Clock, relays and routes: `python3 -m unittest` in `lambda-clock/`,
+  `upload-relay/` (uses botocore when installed), `mailrelay/` and `proxy/`.
+- After changing the public routes:
+  `MACRO_DOMAIN=example.test ACME_EMAIL=a@example.test caddy validate --config infra/selfhost/proxy/Caddyfile --adapter caddyfile`
 - After changing the workflow module: `cargo x workflows` and
   `cargo test -p xtask_workflows`.
 
@@ -87,3 +98,13 @@ s3proxy cannot.
 - The relay sends events only for buckets in its `NOTIFY`; a new bucket
   notification in `xtask_local`'s `localstack.rs` needs an entry there.
 - The images are amd64 only.
+- A new public path in the local proxy (`proxy.rs` or an inventory
+  `path_prefix`) fails `proxy/test_routes.py` until `proxy/Caddyfile` routes it.
+- Never route the public side to s3proxy, the gateway or the relay's port 8080:
+  only the relay's port 8081 checks signatures.
+- Compose interpolation (`${VAR}`) prefers the shell's variables over
+  `--env-file`; secrets that a shell may also define (AWS_*) go through
+  `env_file`.
+- The presigned check is verified against botocore's signer; if the Rust SDK
+  starts signing extra headers that browsers do not send, uploads get 403
+  with `reason` in the relay log.
