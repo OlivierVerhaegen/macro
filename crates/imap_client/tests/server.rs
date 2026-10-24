@@ -288,7 +288,7 @@ async fn labels_are_keywords_found_by_search_and_removed_again() {
     );
     assert_eq!(
         connection.with_keyword("INBOX", "Klant-A").await.unwrap(),
-        [id.clone()]
+        std::slice::from_ref(&id)
     );
     let tagged = connection
         .organization(&id, &folders)
