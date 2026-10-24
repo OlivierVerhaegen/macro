@@ -142,6 +142,8 @@ pub(crate) struct ApiContext {
     >,
     pub mailbox_initializer: Arc<MailboxInitializer>,
     pub imap_mailbox_initializer: Arc<ImapMailboxInitializer>,
+    /// Signature import for IMAP (Zoho Mail) inboxes.
+    pub zoho_signatures: crate::outbound::imap_mailbox::ZohoSignatures,
     pub smtp_passwords: Arc<
         email::domain::mailbox::smtp_password::SmtpPasswordService<
             crate::outbound::imap_mailbox::ImapSending<crate::composition::ZohoTokens>,

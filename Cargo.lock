@@ -7397,6 +7397,7 @@ dependencies = [
  "uuid",
  "workspace-hack",
  "zeroize",
+ "zoho_client",
 ]
 
 [[package]]

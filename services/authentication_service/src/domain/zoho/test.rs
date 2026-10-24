@@ -32,6 +32,7 @@ fn identity(scopes: Vec<String>) -> VerifiedZohoGrant {
         zuid: "20069488".into(),
         account_id: "2560636000000008002".into(),
         email: "olivier@example.be".into(),
+        mailbox_address: "olivier@example.be".into(),
         send_addresses: vec!["olivier@example.be".into()],
         scopes,
         refresh_token: ZohoRefreshToken::new("refresh".into()),

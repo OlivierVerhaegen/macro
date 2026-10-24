@@ -78,6 +78,9 @@ the gateway `/email` prefix.
   `imap_mailbox/idle.rs` keeps one IDLE connection per active IMAP inbox (in
   `pubsub_workers`) and marks its folder streams due on each change, as a
   Graph notification does; the poll still covers other folders.
+  `POST /email/settings/import-signature` reads Zoho Mail signatures for IMAP
+  inboxes (`imap_mailbox/signature.rs`), and Zoho logs in with the grant's
+  `mailbox_address`, which can differ from the primary (alias) address.
 - Header addresses that Gmail accepts can fail `MacroUserIdStr::try_from_email`.
   Skip the bad address with a WARN that omits it (the parse error echoes it)
   instead of failing the step; see `pubsub::util::build_contact_connections`.

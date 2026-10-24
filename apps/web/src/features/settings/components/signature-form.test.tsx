@@ -18,6 +18,20 @@ const baseProps = {
   onRepliesChange: () => {},
 };
 
+it('names the provider a Zoho Mail inbox imports from', () => {
+  const onImport = vi.fn();
+  render(() => (
+    <SignatureForm
+      {...baseProps}
+      mobile={false}
+      onImport={onImport}
+      importSource="Zoho"
+    />
+  ));
+  fireEvent.click(screen.getByRole('button', { name: 'Import from Zoho' }));
+  expect(onImport).toHaveBeenCalledOnce();
+});
+
 it('offers Gmail import on desktop and locks the form while importing', () => {
   const onImport = vi.fn();
   const { unmount } = render(() => (

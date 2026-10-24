@@ -382,6 +382,10 @@ pub async fn run() -> anyhow::Result<()> {
             )
             .with_connections_enabled(config.outlook_connections_enabled),
         ),
+        zoho_signatures: crate::outbound::imap_mailbox::ZohoSignatures::new(
+            db.clone(),
+            auth_service_client.as_ref().clone(),
+        )?,
         smtp_passwords: Arc::new({
             let sending = crate::outbound::imap_mailbox::ImapSending {
                 gateway: crate::composition::imap_gateway(

@@ -118,6 +118,10 @@ export function SignatureSection(props: { link: EmailLink }) {
 
   // The backend fetches the Gmail signature and saves it, so on success the
   // editor shows the persisted value and any unsaved draft is discarded.
+  // IMAP inboxes are Zoho Mail; the import endpoint reads its signature there.
+  const importSource = () =>
+    props.link.provider === 'IMAP' ? 'Zoho' : 'Gmail';
+
   const importFromGmail = () => {
     setSaveError(null);
     importGmailSignature.mutate(
@@ -127,12 +131,12 @@ export function SignatureSection(props: { link: EmailLink }) {
           if (result.success) {
             setDraft(null);
             editorApi?.setContent(result.settings.signature ?? '');
-            toast.success('Signature imported from Gmail');
+            toast.success(`Signature imported from ${importSource()}`);
           } else if (result.reason === 'no_signature') {
-            toast.failure('No signature found in Gmail');
+            toast.failure(`No signature found in ${importSource()}`);
           } else if (result.reason === 'unresolved_images') {
             setSaveError(
-              "Couldn't import images from your Gmail signature. Add the text here and use the image button to add images."
+              `Couldn't import images from your ${importSource()} signature. Add the text here and use the image button to add images.`
             );
           } else {
             toast.failure('Failed to import signature. Please try again.');
@@ -169,6 +173,7 @@ export function SignatureSection(props: { link: EmailLink }) {
       onClear={removeSignature}
       onImport={importFromGmail}
       importing={importGmailSignature.isPending}
+      importSource={importSource()}
       dirty={isDirty()}
       hasContent={hasContent()}
       pending={updateSettings.isPending}

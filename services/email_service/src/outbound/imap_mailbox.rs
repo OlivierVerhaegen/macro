@@ -21,9 +21,11 @@ use zeroize::Zeroizing;
 mod credentials;
 mod idle;
 mod send;
+mod signature;
 pub mod smtp;
 pub use credentials::ZohoCredentialsClient;
 pub use send::{ImapSendError, ImapSending, PreparedImapSend};
+pub use signature::ZohoSignatures;
 
 #[cfg(test)]
 mod test;

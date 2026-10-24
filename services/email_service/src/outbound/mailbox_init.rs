@@ -78,7 +78,8 @@ impl CompletedMailboxGrantSource for ZohoGrantSource {
                 imap_port: ZOHO_IMAP_PORT,
                 smtp_host: grant.data_center.smtp_host(),
                 smtp_port: ZOHO_SMTP_PORT,
-                username: grant.email.clone(),
+                // Zoho logs in with the mailbox address, not an alias.
+                username: grant.mailbox_address.unwrap_or_else(|| grant.email.clone()),
                 send_addresses: grant.send_addresses,
             }),
             email: grant.email,

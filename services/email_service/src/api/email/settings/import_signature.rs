@@ -8,7 +8,7 @@ use axum::{Extension, Json};
 use email_api_client::domain::models::{EmailApiError, TokenFreshness};
 use email_utils::sanitize_html_fragment;
 use model::response::ErrorResponse;
-use models_email::service::link::Link;
+use models_email::service::link::{Link, UserProvider};
 use models_email::{api, service};
 use strum_macros::AsRefStr;
 use thiserror::Error;
@@ -16,7 +16,7 @@ use utoipa::ToSchema;
 
 #[derive(Debug, Error, AsRefStr)]
 pub enum ImportSignatureError {
-    #[error("No signature found in Gmail")]
+    #[error("No signature found at the email provider")]
     NoSignatureFound,
     #[error("Failed to fetch Gmail signature")]
     GmailApiError(#[from] gmail_client::GmailApiHttpError),
@@ -58,27 +58,11 @@ pub struct ImportSignatureResponse {
     pub settings: api::settings::Settings,
 }
 
-/// Import the user's email signature from Gmail.
-#[utoipa::path(
-    post,
-    tag = "Settings",
-    path = "/email/settings/import-signature",
-    operation_id = "import_signature",
-    responses(
-        (status = 200, body = ImportSignatureResponse),
-        (status = 400, body = ErrorResponse),
-        (status = 401, body = ErrorResponse),
-        (status = 404, description = "No signature found in Gmail"),
-        (status = 422, body = UnresolvedSignatureImagesError),
-        (status = 500, body = ErrorResponse),
-        (status = 502, description = "Failed to communicate with Gmail"),
-    )
-)]
-#[tracing::instrument(skip(ctx))]
-pub async fn import_signature_handler(
-    State(ctx): State<ApiContext>,
-    link: Extension<Link>,
-) -> Result<Json<ImportSignatureResponse>, ImportSignatureError> {
+/// Import the inbox's email signature from Gmail or Zoho Mail.
+async fn gmail_signature(
+    ctx: &ApiContext,
+    link: &Link,
+) -> Result<Option<String>, ImportSignatureError> {
     let access_token = ctx
         .email_api
         .get_access_token(link.id, TokenFreshness::Fresh)
@@ -98,10 +82,36 @@ pub async fn import_signature_handler(
         .find(|alias| alias.send_as_email.eq_ignore_ascii_case(email_address))
         .or_else(|| aliases.iter().find(|alias| alias.is_primary == Some(true)));
 
-    let signature = alias
-        .and_then(|alias| alias.signature.clone())
-        .filter(|sig| !sig.trim().is_empty())
-        .ok_or(ImportSignatureError::NoSignatureFound)?;
+    Ok(alias.and_then(|alias| alias.signature.clone()))
+}
+
+#[utoipa::path(
+    post,
+    tag = "Settings",
+    path = "/email/settings/import-signature",
+    operation_id = "import_signature",
+    responses(
+        (status = 200, body = ImportSignatureResponse),
+        (status = 400, body = ErrorResponse),
+        (status = 401, body = ErrorResponse),
+        (status = 404, description = "No signature found at the email provider"),
+        (status = 422, body = UnresolvedSignatureImagesError),
+        (status = 500, body = ErrorResponse),
+        (status = 502, description = "Failed to communicate with Gmail"),
+    )
+)]
+#[tracing::instrument(skip(ctx))]
+pub async fn import_signature_handler(
+    State(ctx): State<ApiContext>,
+    link: Extension<Link>,
+) -> Result<Json<ImportSignatureResponse>, ImportSignatureError> {
+    let signature = match link.provider {
+        // IMAP inboxes are Zoho Mail, whose signatures come from its Mail API.
+        UserProvider::Imap => ctx.zoho_signatures.signature(link.id).await?,
+        UserProvider::Gmail | UserProvider::Outlook => gmail_signature(&ctx, &link).await?,
+    }
+    .filter(|sig| !sig.trim().is_empty())
+    .ok_or(ImportSignatureError::NoSignatureFound)?;
 
     let mut sanitized_signature = sanitize_html_fragment(&signature);
 

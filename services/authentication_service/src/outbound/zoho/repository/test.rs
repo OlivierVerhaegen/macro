@@ -29,6 +29,7 @@ fn identity(zuid: &str) -> VerifiedZohoGrant {
         zuid: zuid.into(),
         account_id: "2560636000000008002".into(),
         email: "zoho-test@example.com".into(),
+        mailbox_address: "zoho-mailbox@example.com".into(),
         send_addresses: vec!["zoho-test@example.com".into(), "info@example.com".into()],
         scopes: vec!["ZOHOMAIL.PROTOCOL.IMAP".into()],
         refresh_token: ZohoRefreshToken::new("refresh".into()),
@@ -76,6 +77,10 @@ async fn an_attempt_completes_once_and_reconnects_add_a_generation(db: PgPool) {
     assert_eq!(
         second.send_addresses,
         ["zoho-test@example.com", "info@example.com"]
+    );
+    assert_eq!(
+        second.mailbox_address.as_deref(),
+        Some("zoho-mailbox@example.com")
     );
 }
 

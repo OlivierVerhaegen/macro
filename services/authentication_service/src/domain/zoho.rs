@@ -64,6 +64,8 @@ pub struct VerifiedZohoGrant {
     pub zuid: String,
     pub account_id: String,
     pub email: String,
+    /// The IMAP and SMTP login, which can differ from the primary `email`.
+    pub mailbox_address: String,
     /// Every address the account may send as, primary included.
     pub send_addresses: Vec<String>,
     pub scopes: Vec<String>,
@@ -95,6 +97,8 @@ pub struct CompletedZohoGrant {
     pub scopes: Vec<String>,
     /// Every address the account may send as, as Zoho reported at consent.
     pub send_addresses: Vec<String>,
+    /// The IMAP and SMTP login; `None` for grants stored before it was kept.
+    pub mailbox_address: Option<String>,
 }
 
 pub struct RefreshedZohoToken {

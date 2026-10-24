@@ -30,6 +30,9 @@ pub struct CompletedZohoGrant {
     /// Every address the account may send as, primary included.
     #[serde(default)]
     pub send_addresses: Vec<String>,
+    /// The IMAP and SMTP login when it differs from `email`'s alias.
+    #[serde(default)]
+    pub mailbox_address: Option<String>,
 }
 
 impl AuthServiceClient {

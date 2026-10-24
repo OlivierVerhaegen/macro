@@ -13,6 +13,9 @@ pub struct ZohoMailAccount {
     pub zuid: String,
     /// The account's primary address, lowercased.
     pub primary_email_address: String,
+    /// The mailbox's own address, lowercased: the IMAP and SMTP login. It can
+    /// differ from the primary address, which may be an alias.
+    pub mailbox_address: String,
     /// Every address the account may send as, primary included, lowercased.
     pub send_addresses: Vec<String>,
 }
@@ -20,7 +23,7 @@ pub struct ZohoMailAccount {
 /// Zoho sends some numeric ids as JSON numbers and others as strings.
 #[derive(serde::Deserialize)]
 #[serde(untagged)]
-enum ZohoId {
+pub(crate) enum ZohoId {
     Text(String),
     Number(u64),
 }
@@ -45,6 +48,8 @@ struct AccountBody {
     account_id: ZohoId,
     zuid: ZohoId,
     primary_email_address: String,
+    mailbox_address: Option<String>,
+    incoming_user_name: Option<String>,
     #[serde(default)]
     send_mail_details: Vec<SendMailBody>,
 }
@@ -53,11 +58,13 @@ struct AccountBody {
 #[serde(rename_all = "camelCase")]
 struct SendMailBody {
     from_address: Option<String>,
+    /// `false` for a send address the user disabled.
+    status: Option<bool>,
 }
 
 /// The Zoho Mail REST API.
 pub struct ZohoMailClient {
-    http: reqwest::Client,
+    pub(crate) http: reqwest::Client,
 }
 
 impl ZohoMailClient {
@@ -98,6 +105,7 @@ impl ZohoMailClient {
                 for address in account
                     .send_mail_details
                     .into_iter()
+                    .filter(|detail| detail.status != Some(false))
                     .filter_map(|detail| detail.from_address)
                 {
                     let address = address.to_lowercase();
@@ -105,10 +113,15 @@ impl ZohoMailClient {
                         send_addresses.push(address);
                     }
                 }
+                let mailbox_address = account
+                    .mailbox_address
+                    .or(account.incoming_user_name)
+                    .map_or_else(|| primary.clone(), |address| address.to_lowercase());
                 ZohoMailAccount {
                     account_id: account.account_id.into(),
                     zuid: account.zuid.into(),
                     primary_email_address: primary,
+                    mailbox_address,
                     send_addresses,
                 }
             })
@@ -116,7 +129,7 @@ impl ZohoMailClient {
     }
 }
 
-async fn read_json<T: serde::de::DeserializeOwned>(
+pub(crate) async fn read_json<T: serde::de::DeserializeOwned>(
     response: reqwest::Response,
 ) -> Result<T, ZohoError> {
     let status = response.status();

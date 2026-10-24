@@ -87,7 +87,10 @@ Accounts. **Save** checks it with Zoho first; a refused password shows
 "Zoho rejected this app password" and stays in the field, an accepted one
 clears it. Reconnecting a Zoho inbox opens the provider dialog again, since its
 data center is not stored. **Remove** on an owned Zoho inbox adds that Zoho keeps
-the access and app password until they are revoked in Zoho Accounts.
+the access and app password until they are revoked in Zoho Accounts. In
+Signatures, a Zoho inbox offers **Import from Zoho** instead of **Import from
+Gmail**; it saves the first signature saved in Zoho Mail, or reports that Zoho
+has none.
 
 ### Notification permission prompt
 

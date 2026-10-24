@@ -11,6 +11,7 @@ mod accounts;
 mod data_center;
 mod error;
 mod oauth;
+mod signatures;
 
 pub use accounts::{ZohoMailAccount, ZohoMailClient};
 pub use data_center::{ZohoDataCenter, ZohoEndpoints};
@@ -19,6 +20,7 @@ pub use oauth::{
     ZohoAccessToken, ZohoAuthorizationRequest, ZohoClientCredentials, ZohoOAuthClient,
     ZohoRefreshToken, ZohoTokenResponse, scopes,
 };
+pub use signatures::ZohoSignature;
 
 #[cfg(test)]
 mod test;

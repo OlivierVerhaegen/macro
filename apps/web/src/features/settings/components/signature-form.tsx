@@ -17,6 +17,8 @@ export function SignatureForm(props: {
   /** Replaces the signature with the one set in Gmail. Omit to hide. */
   onImport?: () => void;
   importing?: boolean;
+  /** Where `onImport` reads the signature from; Gmail when unset. */
+  importSource?: string;
   dirty: boolean;
   hasContent: boolean;
   pending: boolean;
@@ -45,7 +47,9 @@ export function SignatureForm(props: {
               onClick={() => onImport()()}
             >
               <DownloadIcon class="size-4" />
-              {props.importing ? 'Importing…' : 'Import from Gmail'}
+              {props.importing
+                ? 'Importing…'
+                : `Import from ${props.importSource ?? 'Gmail'}`}
             </Button>
           )}
         </Show>

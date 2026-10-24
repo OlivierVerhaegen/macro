@@ -152,9 +152,12 @@ async fn accounts_accept_numeric_ids_and_collect_send_addresses() {
                 "accountId": 2560636000000008002_u64,
                 "zuid": "20069488",
                 "primaryEmailAddress": "Olivier@Example.be",
+                "mailboxAddress": "Tech@Example.be",
                 "sendMailDetails": [
-                    {"fromAddress": "olivier@example.be"},
-                    {"fromAddress": "Hello@Example.be"}
+                    {"fromAddress": "tech@example.be", "validated": false, "status": true},
+                    {"fromAddress": "olivier@example.be", "status": true},
+                    {"fromAddress": "Hello@Example.be"},
+                    {"fromAddress": "old@example.be", "status": false}
                 ]
             }]
         })))
@@ -176,8 +179,10 @@ async fn accounts_accept_numeric_ids_and_collect_send_addresses() {
             account_id: "2560636000000008002".to_owned(),
             zuid: "20069488".to_owned(),
             primary_email_address: "olivier@example.be".to_owned(),
+            mailbox_address: "tech@example.be".to_owned(),
             send_addresses: vec![
                 "olivier@example.be".to_owned(),
+                "tech@example.be".to_owned(),
                 "hello@example.be".to_owned()
             ],
         }]
@@ -202,4 +207,39 @@ async fn an_expired_access_token_is_unauthorized() {
         .await;
 
     assert!(matches!(result, Err(ZohoError::Unauthorized)));
+}
+
+#[tokio::test]
+async fn signatures_keep_saved_content_and_skip_empty_ones() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/accounts/signature"))
+        .and(header("authorization", "Zoho-oauthtoken access"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "status": {"code": 200, "description": "success"},
+            "data": [
+                {"id": 1842613000000105001_u64, "name": "Kantoor", "content": "<div>Olivier</div>"},
+                {"id": "1842613000000105002", "name": "Leeg", "content": "  "}
+            ]
+        })))
+        .mount(&server)
+        .await;
+
+    let signatures = ZohoMailClient::new()
+        .expect("client should build")
+        .signatures(
+            &endpoints(&server),
+            &ZohoAccessToken::new("access".to_owned()),
+        )
+        .await
+        .expect("signatures should load");
+
+    assert_eq!(
+        signatures,
+        vec![ZohoSignature {
+            id: "1842613000000105001".to_owned(),
+            name: Some("Kantoor".to_owned()),
+            content: "<div>Olivier</div>".to_owned(),
+        }]
+    );
 }

@@ -265,7 +265,7 @@ ik niet toe: koppelen vraagt een browser-OAuth en een geheim.
 4. IMAP-gateway en workers in `email_service`, provider-parameter in de
    claim-queries, `sqlx::test` voor de claims.
 5. Schrijfpad: commands, concepten, SMTP-verzending.
-6. `zoho_client`: accounts, aliassen, handtekeningen, labels.
+6. `zoho_client`: accounts, aliassen, handtekeningen (gebouwd: "Import from Zoho"), labels (open: wacht op de `PERMANENTFLAGS`-test).
 7. Route `POST /email/links/imap`, OpenAPI, SDK-coverage, frontenddialoog.
 8. IDLE-worker.
 9. Docs: `AGENTS.md` van de geraakte mappen, `docs/ota/self-hosting.md`, agent
@@ -289,6 +289,7 @@ draaien voor elke commit.
      De namen zijn gelokaliseerd, dus de rollen komen uit de vlaggen. Er is
      geen archiefmap.
    - Geen OBJECTID: bericht-ID's blijven `map/UIDVALIDITY/UID`.
+   - De IMAP- en SMTP-login is het mailboxadres (`mailboxAddress`, bv. `tech@`), niet het primaire adres (`contact@`, een alias). Dat wordt nu bij de grant bewaard.
    - SMTP op `smtp.zoho.eu:465` biedt alleen `AUTH LOGIN PLAIN` (geen
      XOAUTH2), met `SIZE 53477376`.
 2. **Akkoord.** Merge-vriendelijkheid: een nieuwe provider raakt onvermijdelijk
