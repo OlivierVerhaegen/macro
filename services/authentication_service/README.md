@@ -54,7 +54,7 @@ or generated files.
 | `Environment::Develop` | `dev` | Off | Requires `DEVELOPMENT_SIGNUP_ALLOWLIST_JSON` to be present, nonblank, valid, and non-empty. |
 | `Environment::Develop` | `dev` | On | Allows all public signups. The allowlist setting is ignored even if missing or malformed. |
 | `Environment::Production` | `prd` | No effect | Allows all public signups. The allowlist setting is ignored even if present or malformed. |
-| `Environment::Local` | `lcl` | No effect | Allows all public signups. The allowlist setting is ignored even if present or malformed. |
+| `Environment::Local` | `lcl` | No effect | Allows all public signups while the allowlist setting is unset or blank. When set (a self-hosted server runs as Local), it must be valid and non-empty, and only listed and `@macro.com` addresses can sign up. |
 
 With the bypass off, Develop startup fails if the allowlist setting is missing,
 blank, malformed JSON, not a JSON array, empty, contains a non-string entry,

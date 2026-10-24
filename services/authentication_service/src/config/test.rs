@@ -399,21 +399,64 @@ fn develop_signup_policy_bypass_ignores_allowlist_setting() {
 }
 
 #[test]
-fn production_and_local_signup_policy_ignore_allowlist_and_bypass() {
-    for environment in [Environment::Production, Environment::Local] {
-        for bypass in [false, true] {
-            for value in ALLOWLIST_SETTING_CASES {
-                let policy =
-                    resolve_signup_policy(environment, bypass, &development_allowlist(value))
-                        .expect("non-Develop environments should not parse the allowlist setting");
+fn production_signup_policy_ignores_allowlist_and_bypass() {
+    for bypass in [false, true] {
+        for value in ALLOWLIST_SETTING_CASES {
+            let policy =
+                resolve_signup_policy(Environment::Production, bypass, &development_allowlist(value))
+                    .expect("Production should not parse the allowlist setting");
 
-                assert_eq!(policy.allowed_email_count(), None);
-                policy
-                    .authorize_public_email("anyone@example.test")
-                    .expect("non-Develop environments should allow all public signups");
-            }
+            assert_eq!(policy.allowed_email_count(), None);
+            policy
+                .authorize_public_email("anyone@example.test")
+                .expect("Production should allow all public signups");
         }
     }
+}
+
+#[test]
+fn local_signup_policy_is_open_without_allowlist() {
+    for value in [None, Some(""), Some(" \t ")] {
+        let policy = resolve_signup_policy(Environment::Local, false, &development_allowlist(value))
+            .expect("an unset Local allowlist should resolve");
+
+        assert_eq!(policy.allowed_email_count(), None);
+        assert_eq!(policy.authorize_public_email(UNLISTED_PUBLIC_EMAIL), Ok(()));
+    }
+}
+
+#[test]
+fn local_signup_policy_uses_configured_allowlist() {
+    // Self-hosted servers run as Local and close signups this way, bypass or not.
+    for bypass in [false, true] {
+        let policy = resolve_signup_policy(
+            Environment::Local,
+            bypass,
+            &development_allowlist(Some(r#"["owner@example.test"]"#)),
+        )
+        .expect("valid Local allowlist should resolve");
+
+        assert_eq!(policy.allowed_email_count(), Some(1));
+        policy
+            .authorize_public_email("Owner@example.test")
+            .expect("configured email should be allowed");
+        assert_eq!(
+            policy.authorize_public_email(UNLISTED_PUBLIC_EMAIL),
+            Err(SignupPolicyDenial::PublicEmailNotAllowed)
+        );
+    }
+}
+
+#[test]
+fn local_signup_policy_rejects_malformed_allowlist() {
+    let error = resolve_signup_policy(
+        Environment::Local,
+        false,
+        &development_allowlist(Some("not-json")),
+    )
+    .expect_err("a malformed Local allowlist must fail startup, not open signups");
+
+    assert!(format!("{error:#}").contains("DEVELOPMENT_SIGNUP_ALLOWLIST_JSON is invalid"));
 }
 
 #[test]

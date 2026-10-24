@@ -68,7 +68,8 @@ maybe_env_vars! {
     pub struct PosthogApiKey;
     pub struct PosthogHost;
     pub struct LoopsApiKey;
-    /// JSON array of exact email addresses allowed to sign up in Develop.
+    /// JSON array of exact email addresses allowed to sign up in Develop
+    /// (required) and Local (optional; unset leaves Local open).
     pub struct DevelopmentSignupAllowlistJson;
     /// Stripe promotion code GTM invite links grant at checkout. Defaults to `1MF`.
     pub struct GtmInvitePromoCode;
@@ -186,9 +187,10 @@ pub struct Config {
     /// Loops API key (optional). When set, Macro sign-ups are added to our
     /// Loops audience.
     pub loops_api_key: LoopsApiKey,
-    /// JSON array of exact non-Macro email addresses allowed to sign up in Develop.
+    /// JSON array of exact non-Macro email addresses allowed to sign up in Develop,
+    /// and in Local when set (a self-hosted server runs as Local).
     ///
-    /// All `@macro.com` email addresses are allowed by the Develop policy automatically.
+    /// All `@macro.com` email addresses are allowed by the allowlist policy automatically.
     pub development_signup_allowlist_json: DevelopmentSignupAllowlistJson,
     /// Whether Develop allows every public signup without reading
     /// `DEVELOPMENT_SIGNUP_ALLOWLIST_JSON`. Production and Local ignore it.
@@ -370,7 +372,14 @@ fn resolve_signup_policy(
     development_signup_allowlist_json: &DevelopmentSignupAllowlistJson,
 ) -> anyhow::Result<SignupPolicy> {
     match environment {
-        Environment::Production | Environment::Local => Ok(SignupPolicy::allow_all()),
+        Environment::Production => Ok(SignupPolicy::allow_all()),
+        // The local stack leaves the allowlist unset and stays open; a server
+        // that runs as Local (self-hosted) closes signups by setting it.
+        Environment::Local => match nonblank_value(development_signup_allowlist_json.value()) {
+            None => Ok(SignupPolicy::allow_all()),
+            Some(raw_allowlist) => SignupPolicy::from_allowlist_json(raw_allowlist)
+                .context("DEVELOPMENT_SIGNUP_ALLOWLIST_JSON is invalid"),
+        },
         Environment::Develop if development_bypass_signup_allowlist => {
             Ok(SignupPolicy::allow_all())
         }
