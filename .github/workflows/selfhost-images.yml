@@ -1,0 +1,109 @@
+# DO NOT EDIT — regenerate with `cargo x workflows` (from the repository root).
+# Source: tooling/xtask/crates/xtask_workflows/src/workflows/selfhost_images.rs
+name: Self-hosted images
+'on':
+  push:
+    branches:
+    - main
+    - ota/**
+  workflow_dispatch: {}
+permissions:
+  contents: read
+  packages: write
+jobs:
+  rust:
+    if: github.repository != 'macro-inc/macro'
+    name: Rust services
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+    - name: Free disk space
+      run: |-
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+        df -h /
+    - name: Checkout
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      with:
+        clean: 'false'
+        persist-credentials: 'false'
+    - name: Restore cargo cache
+      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+      with:
+        path: |-
+          ~/.cargo/registry/index
+          ~/.cargo/registry/cache
+          ~/.cargo/git/db
+          target/release/deps
+          target/release/build
+          target/release/.fingerprint
+        key: selfhost-rust-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-${{ github.sha }}
+        restore-keys: |-
+          selfhost-rust-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-
+          selfhost-rust-
+    - name: Build binaries
+      run: infra/selfhost/images/ci-build-rust.sh target/selfhost-image
+    - name: Build and push image
+      run: infra/selfhost/images/publish.sh macro-rust infra/selfhost/images/rust.Dockerfile target/selfhost-image --check-libs
+      env:
+        REGISTRY: ghcr.io/${{ github.repository_owner }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  web:
+    if: github.repository != 'macro-inc/macro'
+    name: Web app
+    runs-on: ubuntu-24.04
+    env:
+      CI: 'true'
+    timeout-minutes: 120
+    steps:
+    - name: Checkout
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      with:
+        clean: 'false'
+        persist-credentials: 'false'
+    - name: Setup Nix
+      uses: './.github/actions/setup-nix'
+    - name: Setup
+      uses: './.github/actions/setup-reqs-web'
+    - name: Build
+      run: just build-dev
+      env:
+        VITE_LOCAL_SERVERS: ALL
+        VITE_LOCAL_BACKEND_ORIGIN: same-origin
+      working-directory: apps/web
+    - name: Build and push image
+      run: infra/selfhost/images/publish.sh macro-web infra/selfhost/images/web.Dockerfile apps/web/dist
+      env:
+        REGISTRY: ghcr.io/${{ github.repository_owner }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Teardown Nix
+      if: always()
+      uses: './.github/actions/teardown-nix'
+  node:
+    if: github.repository != 'macro-inc/macro'
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      matrix:
+        include:
+        - dockerfile: docker/sync-service.Dockerfile
+          name: macro-sync
+        - dockerfile: docker/lexical-service.Dockerfile
+          name: macro-lexical
+        - dockerfile: docker/websocket-service.Dockerfile
+          name: macro-websocket
+      fail-fast: false
+    steps:
+    - name: Checkout
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      with:
+        clean: 'false'
+        persist-credentials: 'false'
+    - name: Build and push image
+      run: infra/selfhost/images/publish.sh ${{ matrix.name }} ${{ matrix.dockerfile }} .
+      env:
+        REGISTRY: ghcr.io/${{ github.repository_owner }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true

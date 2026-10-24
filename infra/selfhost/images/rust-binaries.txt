@@ -1,0 +1,17 @@
+# Rust binaries in the macro-rust image, one per line. Each runs as its own
+# compose service (`/app/out/<binary>`); see infra/selfhost/compose.yml.
+agent_harness_service
+authentication_service
+calendar_service
+connection_gateway_service
+contacts_service
+document_storage_service
+document_upload_finalizer_local_worker
+email_scheduled_handler
+email_service
+image_proxy_service
+notification_service
+pubsub_workers
+search_processing_service
+static_file_service
+unfurl_service
