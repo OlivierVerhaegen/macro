@@ -28,6 +28,12 @@ persists to a named volume.
 - Not here: the local development stack → `tooling/xtask/crates/xtask_local`;
   AWS deployments → `infra/stacks/`.
 
+## Recipes
+
+- Create or restore queues, buckets, tables and KMS keys:
+  `cargo x aws-provision --url http://127.0.0.1:4566` against the gateway
+  (the same provisioning as the local stack's LocalStack).
+
 ## Checks
 
 - `docker compose -f infra/selfhost/compose.yml --env-file <env> config -q`
@@ -41,6 +47,8 @@ persists to a named volume.
 - s3proxy runs without signature checks because the code rewrites presigned
   URLs to the public address; never give it a public route except the storage
   path the app uses.
+- s3proxy supports neither bucket notifications nor bucket CORS; the gateway
+  answers those provisioning calls itself. Upload events need the relay.
 - ElasticMQ and DynamoDB Local run as root: their images cannot write to a
   fresh named volume otherwise.
 - The local identity in `xtask_local/src/local/identity.rs` is public; a

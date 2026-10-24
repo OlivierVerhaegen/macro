@@ -32,6 +32,17 @@
 		respond `<?xml version="1.0" encoding="UTF-8"?><NotificationConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/"/>` 200
 	}
 
+	# Per-bucket CORS is unsupported too, and unneeded: the browser reaches
+	# storage through the app's own origin (/local-storage), and s3proxy
+	# allows CORS globally.
+	@cors {
+		method PUT
+		expression {query} == "cors"
+	}
+	handle @cors {
+		respond 200
+	}
+
 	handle {
 		reverse_proxy {$S3_UPSTREAM:s3:80}
 	}

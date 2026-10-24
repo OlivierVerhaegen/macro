@@ -39,6 +39,9 @@ enum Cmd {
     KafkaProvision(InstanceArgs),
     /// Restore missing local AWS resources without resetting databases or volumes.
     LocalstackProvision(InstanceArgs),
+    /// Provision the local AWS resources at an explicit endpoint (the
+    /// self-hosted AWS gateway) instead of an instance's LocalStack.
+    AwsProvision(AwsProvisionArgs),
     /// Write the instance's FusionAuth kickstart and print its path (used by
     /// the self-hosted render step, which replaces its local identity).
     WriteKickstart(InstanceArgs),
@@ -74,6 +77,13 @@ pub enum StackCmd {
     Status(super::stack::StatusArgs),
     /// Tear the instance down: containers, volumes, and state.
     Down(super::stack::DownArgs),
+}
+
+#[derive(Args, Clone)]
+pub struct AwsProvisionArgs {
+    /// The endpoint, e.g. `http://127.0.0.1:4566`.
+    #[arg(long)]
+    pub url: String,
 }
 
 #[derive(Args, Clone, Default)]
@@ -277,6 +287,7 @@ fn run(cli: Cli) -> Result<()> {
             let instance = super::instance::Instance::derive(a.instance.as_deref(), a.port_base)?;
             super::localstack::provision(&instance)
         }
+        Cmd::AwsProvision(a) => super::localstack::provision_url(&a.url),
         Cmd::WriteKickstart(a) => {
             let instance = super::instance::Instance::derive(a.instance.as_deref(), a.port_base)?;
             super::fusionauth::write_kickstart(&instance, None, None)?;

@@ -20,6 +20,16 @@ pub fn provision(instance: &Instance) -> Result<()> {
     rt.block_on(provision_async(&url))
 }
 
+/// Provision the same resources at any LocalStack-compatible endpoint, such as
+/// the self-hosted AWS gateway (`infra/selfhost`).
+pub fn provision_url(url: &str) -> Result<()> {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .context("building tokio runtime")?;
+    rt.block_on(provision_async(url))
+}
+
 async fn provision_async(url: &str) -> Result<()> {
     let cfg = macro_aws_config::local_aws_config(url).await;
 
