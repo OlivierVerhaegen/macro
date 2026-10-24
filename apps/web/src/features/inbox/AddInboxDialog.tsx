@@ -3,6 +3,7 @@ import {
   EmailProviderDialog,
   type ProviderChoice,
 } from '@core/email-link/ProviderDialog';
+import { fireAndForget } from '@core/util/fireAndForget';
 import { fetchEmailConnectionProviders } from '@queries/auth/outlook-link';
 import { createEffect, createSignal, onCleanup } from 'solid-js';
 
@@ -31,18 +32,25 @@ export function AddInboxDialog() {
   const [pending, setPending] = createSignal(false);
   const [outlookAvailable, setOutlookAvailable] = createSignal(false);
   const [zohoAvailable, setZohoAvailable] = createSignal(false);
+  const loadProviders = async (isCurrent: () => boolean) => {
+    try {
+      const providers = await fetchEmailConnectionProviders();
+      if (!isCurrent()) return;
+      setOutlookAvailable(providers.outlook);
+      setZohoAvailable(providers.zoho);
+    } catch {
+      /* Gmail remains available when the availability read fails. */
+    }
+  };
   createEffect(() => {
     if (!isOpen()) return;
     let current = true;
     setOutlookAvailable(false);
     setZohoAvailable(false);
-    void fetchEmailConnectionProviders()
-      .then((providers) => {
-        if (!current) return;
-        setOutlookAvailable(providers.outlook);
-        setZohoAvailable(providers.zoho ?? false);
-      })
-      .catch(() => {});
+    fireAndForget(
+      loadProviders(() => current),
+      'add-inbox'
+    );
     onCleanup(() => {
       current = false;
     });

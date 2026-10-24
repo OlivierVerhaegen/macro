@@ -154,7 +154,7 @@ export async function selectEmailProvider(
   try {
     const providers = await fetchEmailConnectionProviders();
     outlookAvailable = providers.outlook;
-    zohoAvailable = providers.zoho ?? false;
+    zohoAvailable = providers.zoho;
   } catch {
     /* Gmail remains available when the availability read fails. */
   }
