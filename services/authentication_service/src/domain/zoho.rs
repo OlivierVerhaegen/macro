@@ -9,7 +9,7 @@ use std::{
 };
 use uuid::Uuid;
 use zeroize::Zeroizing;
-use zoho_client::{ZohoDataCenter, ZohoRefreshToken};
+use zoho_client::{ZohoDataCenter, ZohoRefreshToken, ZohoServerChoice};
 
 use crate::domain::microsoft::token::{
     EncryptedMicrosoftToken, MicrosoftRefreshToken, MicrosoftTokenCipher,
@@ -48,6 +48,8 @@ pub struct ZohoLinkAttempt {
     pub id: Uuid,
     pub owner: Uuid,
     pub data_center: ZohoDataCenter,
+    /// The mail servers the user chose, carried to mailbox initialization.
+    pub servers: ZohoServerChoice,
     pub redirect_uri: String,
     pub return_uri: Option<String>,
     pub verifier: Zeroizing<String>,
@@ -99,6 +101,8 @@ pub struct CompletedZohoGrant {
     pub send_addresses: Vec<String>,
     /// The IMAP and SMTP login; `None` for grants stored before it was kept.
     pub mailbox_address: Option<String>,
+    /// The mail servers chosen when connecting.
+    pub servers: ZohoServerChoice,
 }
 
 pub struct RefreshedZohoToken {
@@ -204,6 +208,7 @@ pub trait ZohoAuth: Send + Sync {
         &self,
         owner: Uuid,
         data_center: ZohoDataCenter,
+        servers: ZohoServerChoice,
         redirect_uri: String,
         return_uri: Option<String>,
         reconnect: Option<Uuid>,
@@ -272,6 +277,7 @@ impl<R: ZohoGrantRepository, P: ZohoIdentityProvider> ZohoAuth for ZohoAuthServi
         &self,
         owner: Uuid,
         data_center: ZohoDataCenter,
+        servers: ZohoServerChoice,
         redirect_uri: String,
         return_uri: Option<String>,
         reconnect: Option<Uuid>,
@@ -287,6 +293,7 @@ impl<R: ZohoGrantRepository, P: ZohoIdentityProvider> ZohoAuth for ZohoAuthServi
             id: macro_uuid::generate_uuid_v7(),
             owner,
             data_center,
+            servers,
             redirect_uri,
             return_uri,
             verifier: Zeroizing::new(verifier),

@@ -79,7 +79,9 @@ offline and confirm it uses the saved settings.
 ### Zoho Mail inboxes
 
 Where the server has Zoho configured, **Connect email** also offers **Zoho Mail**
-next to a data-center picker (Europe preselected); it starts Zoho consent and
+next to a data-center picker (Europe preselected) and a **Zoho mail servers**
+picker: Automatic (imappro/smtppro for an own-domain address), imappro/smtppro,
+or imap/smtp, with a link to Zoho's server list. It starts Zoho consent and
 returns through the same inbox callback. A Zoho inbox is labelled **Zoho Mail**
 in Accounts, and its owner sees **App password for sending** under it: Zoho's
 SMTP server takes no OAuth, so sending needs an app password from Zoho

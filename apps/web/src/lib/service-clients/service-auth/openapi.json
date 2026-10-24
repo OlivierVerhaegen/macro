@@ -2266,6 +2266,15 @@
             }
           },
           {
+            "name": "servers",
+            "in": "query",
+            "description": "**OPTIONAL**. Zoho mail servers: auto (default; imappro/smtppro for a domain address), pro or standard.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "original_url",
             "in": "query",
             "description": "**OPTIONAL**. The original URL to redirect to.",

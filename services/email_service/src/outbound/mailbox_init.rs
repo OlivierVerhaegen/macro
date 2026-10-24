@@ -68,10 +68,8 @@ impl CompletedMailboxGrantSource for ZohoGrantSource {
                     _ => InitializationError::Unavailable,
                 })?;
         // Zoho logs in with the mailbox address, not an alias.
-        let username = grant
-            .mailbox_address
-            .unwrap_or_else(|| grant.email.clone());
-        let servers = grant.data_center.mail_servers(&username);
+        let username = grant.mailbox_address.unwrap_or_else(|| grant.email.clone());
+        let servers = grant.data_center.mail_servers(&username, grant.servers);
         Ok(VerifiedMailboxGrant {
             scopes: grant.scopes,
             calendar_requested: false,

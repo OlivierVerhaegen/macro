@@ -11,6 +11,10 @@ export type InitZohoLinkParams = {
    */
   data_center: string;
   /**
+   * **OPTIONAL**. Zoho mail servers: auto (default; imappro/smtppro for a domain address), pro or standard.
+   */
+  servers?: string;
+  /**
    * **OPTIONAL**. The original URL to redirect to.
    */
   original_url?: string;

@@ -284,7 +284,11 @@ it('uses the provider selected from a generic connect entry point', async () => 
   });
 });
 it('connects Zoho Mail in the chosen data center without an account hint', async () => {
-  mocks.choose.mockResolvedValue({ provider: 'ZOHO', dataCenter: 'eu' });
+  mocks.choose.mockResolvedValue({
+    provider: 'ZOHO',
+    dataCenter: 'eu',
+    servers: 'standard',
+  });
   mocks.startZoho.mockResolvedValue(
     ok({
       link_id: 'zoho-link',
@@ -301,6 +305,7 @@ it('connects Zoho Mail in the chosen data center without an account hint', async
   expect(mocks.startZoho).toHaveBeenCalledExactlyOnceWith({
     originalUrl: 'macro://android-auth/test-attempt',
     dataCenter: 'eu',
+    servers: 'standard',
     reconnectLinkId: 'existing-zoho-link',
   });
   expect(mocks.authenticate).toHaveBeenCalledWith(

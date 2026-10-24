@@ -6,6 +6,7 @@ fn attempt() -> ZohoLinkAttempt {
         id: macro_uuid::generate_uuid_v7(),
         owner: macro_uuid::generate_uuid_v7(),
         data_center: ZohoDataCenter::Eu,
+        servers: zoho_client::ZohoServerChoice::Auto,
         redirect_uri: "https://auth.example.com/oauth2/zoho/callback".into(),
         return_uri: Some("https://app.example.com".into()),
         verifier: Zeroizing::new("verifier".into()),

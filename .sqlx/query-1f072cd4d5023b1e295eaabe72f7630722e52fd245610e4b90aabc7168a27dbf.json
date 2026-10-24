@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT g.grant_id, g.generation, g.email_address, g.data_center, g.zoho_user_id,\n                g.zoho_account_id, g.scopes, g.send_addresses, g.mailbox_address\n            FROM in_progress_user_link p\n            JOIN zoho_link_attempts a ON a.id = p.id AND a.completed_at IS NOT NULL\n            JOIN zoho_oauth_grants g ON g.grant_id = a.grant_id\n                AND g.fusionauth_user_id = p.macro_user_id::text AND g.email_address = p.linked_email\n            WHERE p.id = $1 AND p.macro_user_id = $2 AND p.email_provider = 'IMAP'\n                AND p.created_at > now() - interval '24 hours' AND g.revoked_at IS NULL\n        ",
+  "query": "\n            SELECT g.grant_id, g.generation, g.email_address, g.data_center, g.zoho_user_id,\n                g.zoho_account_id, g.scopes, g.send_addresses, g.mailbox_address, a.mail_servers\n            FROM in_progress_user_link p\n            JOIN zoho_link_attempts a ON a.id = p.id AND a.completed_at IS NOT NULL\n            JOIN zoho_oauth_grants g ON g.grant_id = a.grant_id\n                AND g.fusionauth_user_id = p.macro_user_id::text AND g.email_address = p.linked_email\n            WHERE p.id = $1 AND p.macro_user_id = $2 AND p.email_provider = 'IMAP'\n                AND p.created_at > now() - interval '24 hours' AND g.revoked_at IS NULL\n        ",
   "describe": {
     "columns": [
       {
@@ -47,6 +47,11 @@
         "ordinal": 8,
         "name": "mailbox_address",
         "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "mail_servers",
+        "type_info": "Text"
       }
     ],
     "parameters": {
@@ -64,8 +69,9 @@
       false,
       false,
       false,
-      true
+      true,
+      false
     ]
   },
-  "hash": "9c1b412e109d86ec3f732da08da153611108ea8dceb5ce4ffd3ee82aed0d3be3"
+  "hash": "1f072cd4d5023b1e295eaabe72f7630722e52fd245610e4b90aabc7168a27dbf"
 }

@@ -292,8 +292,8 @@ draaien voor elke commit.
    - Volgens de Zoho-docs (IMAP- en SMTP-instellingen) gebruiken betaalde
      organisaties met een eigen domein `imappro`/`smtppro`, en persoonlijke
      `@zoho`/`@zohomail`-adressen en gratis organisaties `imap`/`smtp`.
-     Macro kiest `imappro.zoho.eu`/`smtppro.zoho.eu` voor een eigen domein
-     (`ZohoDataCenter::mail_servers`). De test hierboven liep op `imap.zoho.eu`;
+     Bij het koppelen kiest de gebruiker de servers (standaard Automatisch:
+     `imappro`/`smtppro` voor een eigen domein), met een link naar de Zoho-docs. De test hierboven liep op `imap.zoho.eu`;
      de juiste servers staan in Zoho onder Instellingen → Mail-accounts →
      Serverconfiguratie.
    - Handtekeningen (`GET /api/accounts/signature`, scope
@@ -319,3 +319,16 @@ draaien voor elke commit.
    Application" aan, met als redirect-URI de callback van je eigen
    auth-service? Ik heb de client-ID nodig als configwaarde; het secret gaat
    in je eigen secretbeheer, nooit in de chat.
+
+## Zoho-limieten (rates-and-limits, gecontroleerd 24 oktober 2026)
+
+| Limiet | Waarde | Gevolg voor Macro |
+| --- | --- | --- |
+| IMAP-verbindingen | 100 per account | Sync, commands, IDLE en verzenden openen korte verbindingen plus één IDLE-verbinding; ruim eronder. |
+| IMAP-fetch | 1 GB per 15 minuten (organisatie), 250 MB (persoonlijk) | De eerste sync van een grote mailbox kan dit raken; Zoho blokkeert dan 15 minuten en de runtime probeert later opnieuw. Een fetch-budget per link is nog niet gebouwd. |
+| API | 30 verzoeken per minuut, daarna een geheime blokkeerperiode | Macro gebruikt de API alleen bij koppelen (accounts) en voor de handtekening-import. Verzenden via de API zou per bericht meetellen. |
+| Verzenden extern | 50-500 per uur, dynamisch op reputatie | Daarna een uur geen verzending; SMTP weigert met een melding. |
+| Verzenden intern | 1.000 per uur | |
+| Ontvangers per bericht | 150 extern (betaald), 100 (gratis), 500 intern | Meer ontvangers weigert de server; de verzending faalt dan definitief. |
+| Inkomend bericht | 40 MB | |
+

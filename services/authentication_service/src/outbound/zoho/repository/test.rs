@@ -17,6 +17,7 @@ fn pending(owner: Uuid) -> ZohoLinkAttempt {
         id: macro_uuid::generate_uuid_v7(),
         owner,
         data_center: ZohoDataCenter::Eu,
+        servers: zoho_client::ZohoServerChoice::Standard,
         redirect_uri: "https://auth.example.com/oauth2/zoho/callback".into(),
         return_uri: None,
         verifier: Zeroizing::new("verifier".into()),
@@ -82,6 +83,7 @@ async fn an_attempt_completes_once_and_reconnects_add_a_generation(db: PgPool) {
         second.mailbox_address.as_deref(),
         Some("zoho-mailbox@example.com")
     );
+    assert_eq!(second.servers, zoho_client::ZohoServerChoice::Standard);
 }
 
 #[sqlx::test(migrator = "MACRO_DB_MIGRATIONS")]

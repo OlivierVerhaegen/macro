@@ -11,7 +11,7 @@ use macro_authorization::{MacroAuthorizationExtractor, UserOrInternal};
 use model::response::ErrorResponse;
 use serde_utils::urlencode::UrlEncoded;
 use url::Url;
-use zoho_client::ZohoDataCenter;
+use zoho_client::{ZohoDataCenter, ZohoServerChoice};
 
 use crate::api::{
     context::{ApiContext, AuthorizationService},
@@ -67,6 +67,8 @@ impl IntoResponse for InitZohoLinkError {
 #[derive(Debug, serde::Deserialize)]
 pub(crate) struct InitZohoLinkQueryParams {
     data_center: ZohoDataCenter,
+    #[serde(default)]
+    servers: ZohoServerChoice,
     reconnect_link_id: Option<uuid::Uuid>,
     original_url: Option<UrlEncoded<Url>>,
 }
@@ -78,6 +80,7 @@ pub(crate) struct InitZohoLinkQueryParams {
     path = "/link/zoho",
     params(
         ("data_center" = String, Query, description = "The Zoho data center of the account: com, eu, in, com.au, jp, ca, sa or com.cn."),
+        ("servers" = Option<String>, Query, description = "**OPTIONAL**. Zoho mail servers: auto (default; imappro/smtppro for a domain address), pro or standard."),
         ("original_url" = Option<String>, Query, description = "**OPTIONAL**. The original URL to redirect to."),
         ("reconnect_link_id" = Option<uuid::Uuid>, Query, description = "Existing accessible inbox being reconnected.")
     ),
@@ -115,6 +118,7 @@ pub async fn init_zoho_link_handler(
         .start_link(
             owner,
             params.data_center,
+            params.servers,
             format_redirect_uri("zoho"),
             original_url.map(String::from),
             params.reconnect_link_id,

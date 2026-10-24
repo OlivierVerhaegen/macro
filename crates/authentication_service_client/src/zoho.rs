@@ -33,6 +33,9 @@ pub struct CompletedZohoGrant {
     /// The IMAP and SMTP login when it differs from `email`'s alias.
     #[serde(default)]
     pub mailbox_address: Option<String>,
+    /// The mail servers chosen when connecting.
+    #[serde(default)]
+    pub servers: zoho_client::ZohoServerChoice,
 }
 
 impl AuthServiceClient {

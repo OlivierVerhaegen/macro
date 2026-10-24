@@ -80,7 +80,9 @@ the gateway `/email` prefix.
   Graph notification does; the poll still covers other folders.
   `POST /email/settings/import-signature` reads Zoho Mail signatures for IMAP
   inboxes (`imap_mailbox/signature.rs`), and Zoho logs in with the grant's
-  `mailbox_address`, which can differ from the primary (alias) address.
+  `mailbox_address`, which can differ from the primary (alias) address. The
+  IMAP/SMTP hosts follow the server choice made when connecting
+  (`ZohoDataCenter::mail_servers`, carried on the link attempt).
   Label deletion on IMAP inboxes strips the keyword from messages through
   `imap_mailbox/labels.rs`; `ProviderMailboxSettings` holds the IMAP gateway.
 - Header addresses that Gmail accepts can fail `MacroUserIdStr::try_from_email`.

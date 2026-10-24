@@ -1,4 +1,4 @@
-import type { ZohoDataCenter } from '@core/email-link/zoho';
+import type { ZohoDataCenter, ZohoServerChoice } from '@core/email-link/zoho';
 import { authServiceClient } from '@service-auth/client';
 import { useMutation } from '@tanstack/solid-query';
 
@@ -8,6 +8,7 @@ export function useInitZohoLink() {
     mutationFn: (params: {
       originalUrl: string;
       dataCenter: ZohoDataCenter;
+      servers: ZohoServerChoice;
       reconnectLinkId?: string;
     }) => authServiceClient.initZohoLink(params.originalUrl, params),
   }));

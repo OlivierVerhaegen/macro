@@ -66,25 +66,54 @@ impl ZohoDataCenter {
     }
 
     /// The IMAP (implicit TLS, port 993) and SMTP (implicit TLS, port 465)
-    /// servers for a mailbox address. Zoho serves organizations on their own
-    /// domain from `imappro`/`smtppro` and personal `@zoho`/`@zohomail`
-    /// addresses from `imap`/`smtp`; a client on the wrong pair stops working.
-    /// Free organizations on their own domain also use `imap`/`smtp`, which the
-    /// address cannot tell apart; this fork serves paid organizations.
-    pub fn mail_servers(self, mailbox_address: &str) -> ZohoMailServers {
-        let domain = mailbox_address
-            .rsplit_once('@')
-            .map_or("", |(_, domain)| domain)
-            .to_ascii_lowercase();
-        let personal = domain
-            .split_once('.')
-            .is_some_and(|(name, _)| name == "zoho" || name == "zohomail");
-        let suffix = if personal { "" } else { "pro" };
+    /// servers for a mailbox address. Zoho serves paid organizations on their
+    /// own domain from `imappro`/`smtppro`, and personal `@zoho`/`@zohomail`
+    /// addresses and free organizations from `imap`/`smtp`; a client on the
+    /// wrong pair stops working. The address cannot tell a free organization
+    /// apart, so [`ZohoServerChoice::Auto`] assumes a domain address is paid.
+    pub fn mail_servers(self, mailbox_address: &str, choice: ZohoServerChoice) -> ZohoMailServers {
+        let pro = match choice {
+            ZohoServerChoice::Pro => true,
+            ZohoServerChoice::Standard => false,
+            ZohoServerChoice::Auto => !mailbox_address
+                .rsplit_once('@')
+                .map_or("", |(_, domain)| domain)
+                .to_ascii_lowercase()
+                .split_once('.')
+                .is_some_and(|(name, _)| name == "zoho" || name == "zohomail"),
+        };
+        let suffix = if pro { "pro" } else { "" };
         ZohoMailServers {
             imap_host: format!("imap{suffix}.{}", self.domain()),
             smtp_host: format!("smtp{suffix}.{}", self.domain()),
         }
     }
+}
+
+/// Which Zoho mail servers a connection uses; see [`ZohoDataCenter::mail_servers`].
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    strum::EnumString,
+    strum::Display,
+    strum::AsRefStr,
+)]
+#[serde(rename_all = "lowercase")]
+#[strum(serialize_all = "lowercase")]
+pub enum ZohoServerChoice {
+    /// `imappro`/`smtppro` for a domain address, else `imap`/`smtp`.
+    #[default]
+    Auto,
+    /// `imappro`/`smtppro`: paid organizations on their own domain.
+    Pro,
+    /// `imap`/`smtp`: personal accounts and free organizations.
+    Standard,
 }
 
 /// The IMAP and SMTP hosts of one Zoho mailbox.

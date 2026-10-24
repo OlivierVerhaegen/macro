@@ -299,8 +299,13 @@ export function useAddInboxFlow() {
           reconnectLinkId,
         })
       )
-      .with({ provider: 'ZOHO' }, ({ dataCenter }) =>
-        initZohoLink.mutateAsync({ originalUrl, dataCenter, reconnectLinkId })
+      .with({ provider: 'ZOHO' }, ({ dataCenter, servers }) =>
+        initZohoLink.mutateAsync({
+          originalUrl,
+          dataCenter,
+          servers,
+          reconnectLinkId,
+        })
       )
       .with({ provider: 'GMAIL' }, () =>
         initGmailLink.mutateAsync({ originalUrl, scopes, reconnectLinkId })

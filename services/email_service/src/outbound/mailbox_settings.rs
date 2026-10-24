@@ -74,12 +74,22 @@ where
         match mailbox.provider {
             UserProvider::Imap => self
                 .imap
-                .apply(mailbox.key, &message.id, &action, message.version.as_deref())
+                .apply(
+                    mailbox.key,
+                    &message.id,
+                    &action,
+                    message.version.as_deref(),
+                )
                 .await
                 .map(|_| ()),
             UserProvider::Gmail | UserProvider::Outlook => self
                 .outlook
-                .apply(access(mailbox), &message.id, &action, message.version.as_deref())
+                .apply(
+                    access(mailbox),
+                    &message.id,
+                    &action,
+                    message.version.as_deref(),
+                )
                 .await
                 .map(|_| ()),
         }

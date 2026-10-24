@@ -2,7 +2,7 @@ use crate::domain::{microsoft::token::EncryptedMicrosoftToken, zoho::*};
 use sqlx::PgPool;
 use uuid::Uuid;
 use zeroize::Zeroizing;
-use zoho_client::ZohoDataCenter;
+use zoho_client::{ZohoDataCenter, ZohoServerChoice};
 
 #[cfg(test)]
 mod test;
@@ -23,6 +23,10 @@ fn database_error(error: sqlx::Error) -> ZohoAuthError {
 }
 
 fn data_center(value: &str) -> Result<ZohoDataCenter, ZohoAuthError> {
+    value.parse().map_err(|_| ZohoAuthError::Unavailable)
+}
+
+fn servers(value: &str) -> Result<ZohoServerChoice, ZohoAuthError> {
     value.parse().map_err(|_| ZohoAuthError::Unavailable)
 }
 
@@ -146,11 +150,12 @@ impl ZohoGrantRepository for PgZohoGrants {
         sqlx::query!(
             r#"
             INSERT INTO zoho_link_attempts
-                (id, data_center, redirect_uri, return_uri, pkce_verifier, expires_at)
-            VALUES ($1, $2, $3, $4, $5, $6)
+                (id, data_center, mail_servers, redirect_uri, return_uri, pkce_verifier, expires_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
         "#,
             attempt.id,
             attempt.data_center.as_ref(),
+            attempt.servers.as_ref(),
             attempt.redirect_uri,
             attempt.return_uri,
             attempt.verifier.as_str(),
@@ -169,8 +174,8 @@ impl ZohoGrantRepository for PgZohoGrants {
             FROM in_progress_user_link p
             WHERE a.id = $1 AND a.id = p.id AND p.email_provider = 'IMAP'
                 AND a.claimed_at IS NULL AND a.completed_at IS NULL AND a.expires_at > now()
-            RETURNING a.id, p.macro_user_id, a.data_center, a.redirect_uri, a.return_uri,
-                a.pkce_verifier, a.expires_at
+            RETURNING a.id, p.macro_user_id, a.data_center, a.mail_servers, a.redirect_uri,
+                a.return_uri, a.pkce_verifier, a.expires_at
         "#,
             id
         )
@@ -182,6 +187,7 @@ impl ZohoGrantRepository for PgZohoGrants {
             id: row.id,
             owner: row.macro_user_id,
             data_center: data_center(&row.data_center)?,
+            servers: servers(&row.mail_servers)?,
             redirect_uri: row.redirect_uri,
             return_uri: row.return_uri,
             verifier: Zeroizing::new(row.pkce_verifier),
@@ -289,7 +295,7 @@ impl ZohoGrantRepository for PgZohoGrants {
         let row = sqlx::query!(
             r#"
             SELECT g.grant_id, g.generation, g.email_address, g.data_center, g.zoho_user_id,
-                g.zoho_account_id, g.scopes, g.send_addresses, g.mailbox_address
+                g.zoho_account_id, g.scopes, g.send_addresses, g.mailbox_address, a.mail_servers
             FROM in_progress_user_link p
             JOIN zoho_link_attempts a ON a.id = p.id AND a.completed_at IS NOT NULL
             JOIN zoho_oauth_grants g ON g.grant_id = a.grant_id
@@ -315,6 +321,7 @@ impl ZohoGrantRepository for PgZohoGrants {
             scopes: row.scopes,
             send_addresses: row.send_addresses,
             mailbox_address: row.mailbox_address,
+            servers: servers(&row.mail_servers)?,
         })
     }
 

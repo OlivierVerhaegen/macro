@@ -14,7 +14,7 @@ mod oauth;
 mod signatures;
 
 pub use accounts::{ZohoMailAccount, ZohoMailClient};
-pub use data_center::{ZohoDataCenter, ZohoEndpoints, ZohoMailServers};
+pub use data_center::{ZohoDataCenter, ZohoEndpoints, ZohoMailServers, ZohoServerChoice};
 pub use error::ZohoError;
 pub use oauth::{
     ZohoAccessToken, ZohoAuthorizationRequest, ZohoClientCredentials, ZohoOAuthClient,

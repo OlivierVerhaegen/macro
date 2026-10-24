@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            UPDATE zoho_link_attempts a SET claimed_at = now()\n            FROM in_progress_user_link p\n            WHERE a.id = $1 AND a.id = p.id AND p.email_provider = 'IMAP'\n                AND a.claimed_at IS NULL AND a.completed_at IS NULL AND a.expires_at > now()\n            RETURNING a.id, p.macro_user_id, a.data_center, a.redirect_uri, a.return_uri,\n                a.pkce_verifier, a.expires_at\n        ",
+  "query": "\n            UPDATE zoho_link_attempts a SET claimed_at = now()\n            FROM in_progress_user_link p\n            WHERE a.id = $1 AND a.id = p.id AND p.email_provider = 'IMAP'\n                AND a.claimed_at IS NULL AND a.completed_at IS NULL AND a.expires_at > now()\n            RETURNING a.id, p.macro_user_id, a.data_center, a.mail_servers, a.redirect_uri,\n                a.return_uri, a.pkce_verifier, a.expires_at\n        ",
   "describe": {
     "columns": [
       {
@@ -20,21 +20,26 @@
       },
       {
         "ordinal": 3,
-        "name": "redirect_uri",
+        "name": "mail_servers",
         "type_info": "Text"
       },
       {
         "ordinal": 4,
-        "name": "return_uri",
+        "name": "redirect_uri",
         "type_info": "Text"
       },
       {
         "ordinal": 5,
-        "name": "pkce_verifier",
+        "name": "return_uri",
         "type_info": "Text"
       },
       {
         "ordinal": 6,
+        "name": "pkce_verifier",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
         "name": "expires_at",
         "type_info": "Timestamptz"
       }
@@ -49,10 +54,11 @@
       false,
       false,
       false,
+      false,
       true,
       false,
       false
     ]
   },
-  "hash": "6a636a2016b8da2e458b9b0c59dabdd3ff69a4b8bea9857b77a8aea894bce3c9"
+  "hash": "e28ad27d2cc0bb846f010e2697d7748e4718408afb8f357a038e5474dedf68d6"
 }

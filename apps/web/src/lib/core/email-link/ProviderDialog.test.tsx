@@ -37,6 +37,7 @@ describe('EmailProviderDialog', () => {
     expect(onSelect).toHaveBeenCalledExactlyOnceWith({
       provider: 'ZOHO',
       dataCenter: 'eu',
+      servers: 'auto',
     });
   });
 

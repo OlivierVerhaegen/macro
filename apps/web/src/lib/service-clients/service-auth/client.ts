@@ -1115,11 +1115,12 @@ export const authServiceClient = {
   /** Connect a Zoho Mail inbox in the given Zoho data center. */
   async initZohoLink(
     originalUrl: string,
-    options: { dataCenter: string; reconnectLinkId?: string }
+    options: { dataCenter: string; servers: string; reconnectLinkId?: string }
   ) {
     const params = new URLSearchParams({
       original_url: encodeURIComponent(originalUrl),
       data_center: options.dataCenter,
+      servers: options.servers,
     });
     if (options.reconnectLinkId)
       params.set('reconnect_link_id', options.reconnectLinkId);
