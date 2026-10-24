@@ -274,6 +274,25 @@ pub const QUEUES: &[Queue] = &[
             Url,
         )],
     },
+    Queue {
+        // Fed by organization_retention_trigger, consumed by
+        // organization_retention_handler. The local stack runs neither; a
+        // self-hosted server (infra/selfhost) runs both.
+        name: macro_queues::OrganizationRetentionQueue::LOCAL,
+        bindings: &[(
+            macro_queues::OrganizationRetentionQueue::OVERRIDE_ENV_VAR_NAME,
+            Name,
+        )],
+    },
+    Queue {
+        // Fed by upload_extractor_lambda_trigger, consumed by
+        // upload_extractor_lambda_handler; as above, only infra/selfhost runs them.
+        name: macro_queues::UploadExtractorQueue::LOCAL,
+        bindings: &[(
+            macro_queues::UploadExtractorQueue::OVERRIDE_ENV_VAR_NAME,
+            Name,
+        )],
+    },
 ];
 
 /// Every local S3 bucket and the env var that references it.
