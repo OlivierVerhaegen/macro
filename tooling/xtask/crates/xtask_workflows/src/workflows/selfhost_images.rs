@@ -117,7 +117,8 @@ fn web_job() -> Job {
                 .run("just build-dev")
                 .working_directory(xtask_paths::repo_dir!("apps/web"))
                 .add_env(("VITE_LOCAL_SERVERS", "ALL"))
-                .add_env(("VITE_LOCAL_BACKEND_ORIGIN", "same-origin")),
+                .add_env(("VITE_LOCAL_BACKEND_ORIGIN", "same-origin"))
+                .add_env(("VITE_AI_EDITING_WORKER_URL", "/ai-editing")),
         )
         // No teardown_nix: it frees Namespace's /nix cache volume, which this
         // runner lacks, and its `fuser -km /nix` kills the dev shell's own bash.
@@ -128,7 +129,8 @@ fn web_job() -> Job {
 }
 
 /// The images with Dockerfiles of their own: the JavaScript services the local
-/// stack builds, and the convert service (LibreOfficeKit).
+/// stack builds, the AI editing worker, the analytics proxy and the convert
+/// service (LibreOfficeKit).
 fn node_job() -> Job {
     base_job("${{ matrix.name }}", 180)
         .strategy(Strategy {
@@ -139,6 +141,8 @@ fn node_job() -> Job {
                     { "name": "macro-lexical", "dockerfile": "docker/lexical-service.Dockerfile" },
                     { "name": "macro-websocket", "dockerfile": "docker/websocket-service.Dockerfile" },
                     { "name": "macro-convert", "dockerfile": "docker/Dockerfile.convert_service" },
+                    { "name": "macro-ai-editing", "dockerfile": "infra/selfhost/images/ai-editing.Dockerfile" },
+                    { "name": "macro-analytics", "dockerfile": "infra/selfhost/images/analytics.Dockerfile" },
                 ],
             })),
             max_parallel: None,

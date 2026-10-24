@@ -81,6 +81,7 @@ jobs:
       env:
         VITE_LOCAL_SERVERS: ALL
         VITE_LOCAL_BACKEND_ORIGIN: same-origin
+        VITE_AI_EDITING_WORKER_URL: /ai-editing
       working-directory: apps/web
     - name: Build and push image
       run: infra/selfhost/images/publish.sh macro-web infra/selfhost/images/web.Dockerfile apps/web/dist
@@ -103,6 +104,10 @@ jobs:
           name: macro-websocket
         - dockerfile: docker/Dockerfile.convert_service
           name: macro-convert
+        - dockerfile: infra/selfhost/images/ai-editing.Dockerfile
+          name: macro-ai-editing
+        - dockerfile: infra/selfhost/images/analytics.Dockerfile
+          name: macro-analytics
       fail-fast: false
     steps:
     - name: Checkout

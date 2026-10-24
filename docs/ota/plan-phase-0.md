@@ -195,8 +195,15 @@ triggered on one server run (section 5.7).
   domain, without a code change. `import.meta.env.DEV` is on in it; among other
   things that enables automatic login with `?email=`, which only works when the
   backend returns the code, which it does not here.
-- **Not in phase 0 yet:** `ai_editing_worker` and `analytics_proxy`
-  (Cloudflare Workers that mount the repository locally).
+- **`ai_editing_worker` and `analytics_proxy`** are Cloudflare Workers that the
+  local stack runs from a mounted checkout; here they get images of their own
+  (`macro-ai-editing`, `macro-analytics`) running `wrangler dev`. The AI editing
+  worker refuses to start without the Anthropic, Cerebras and OpenAI keys
+  (`selfhost.conf [env]`); its D1 trace store is the `ai_editing_state` volume.
+  The bundle is built with `VITE_AI_EDITING_WORKER_URL=/ai-editing`, otherwise
+  it calls Macro's hosted worker. The analytics proxy only forwards what the
+  bundle sends, which is nothing without a PostHog key or a browser OTLP
+  endpoint.
 - **Backups:** besides Postgres and the S3 data, the `sync_state` volume holds
   the live state of shared documents.
 - **`agent_harness_service`** gets the host's Docker socket, as locally, to

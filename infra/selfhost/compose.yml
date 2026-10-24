@@ -680,6 +680,37 @@ services:
         aliases:
           - lexical-service
 
+  # Agent editing of documents (Cloudflare Worker under wrangler dev). It joins
+  # documents through sync-service and needs the Anthropic, Cerebras and
+  # OpenAI keys from selfhost.conf [env]; it fails at startup without them.
+  ai_editing_worker:
+    <<: [*defaults, *env-file]
+    image: ${MACRO_REGISTRY:-ghcr.io/olivierverhaegen}/macro-ai-editing:${MACRO_VERSION:?set to the image commit}
+    environment:
+      WRANGLER_SEND_METRICS: "false"
+    networks:
+      backend:
+        aliases:
+          - ai-editing-worker
+    volumes:
+      # Its D1 trace store.
+      - ai_editing_state:/app/services/ai-editing-worker/.wrangler/state
+
+  # PostHog and OTLP forwarding for the browser. It forwards only what the
+  # bundle sends, and the bundle sends nothing without a PostHog key or a
+  # browser OTLP endpoint; the OTLP targets are overridable.
+  analytics_proxy:
+    <<: *defaults
+    image: ${MACRO_REGISTRY:-ghcr.io/olivierverhaegen}/macro-analytics:${MACRO_VERSION:?set to the image commit}
+    environment:
+      OTLP_TRACES_INTAKE_URL: ${OTLP_TRACES_INTAKE_URL:-http://otel-collector:4318/v1/traces}
+      OTLP_LOGS_INTAKE_URL: ${OTLP_LOGS_INTAKE_URL:-http://otel-collector:4318/v1/logs}
+      WRANGLER_SEND_METRICS: "false"
+    networks:
+      backend:
+        aliases:
+          - analytics-proxy
+
   # Plain SMTP from the services and FusionAuth, delivered to Zoho over
   # STARTTLS with the app password (mailrelay/mailrelay.py). Its env file holds
   # only that password, so the services never see it.
@@ -733,5 +764,6 @@ volumes:
   garage-meta:
   garage-data:
   sync_state:
+  ai_editing_state:
   caddy_data:
   caddy_config:

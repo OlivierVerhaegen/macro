@@ -34,8 +34,10 @@ queue.
 The services run from GHCR images built by the `selfhost-images` workflow
 (`tooling/xtask/crates/xtask_workflows/src/workflows/selfhost_images.rs`), pinned
 by `MACRO_VERSION`: `macro-rust` holds every Rust binary and the Lambda host;
-`macro-web`, `macro-sync`, `macro-lexical`, `macro-websocket` and
-`macro-convert` the rest. A one-shot `migrate` service applies the MacroDB
+`macro-web`, `macro-sync`, `macro-lexical`, `macro-websocket`,
+`macro-convert`, `macro-ai-editing` and `macro-analytics` the rest. The two
+Cloudflare Workers the local stack runs from a mounted checkout (AI editing,
+analytics) have their own Dockerfiles in `images/` running `wrangler dev`. A one-shot `migrate` service applies the MacroDB
 migrations before the Rust services start.
 
 `proxy` (the `macro-web` image: Caddy with the bundle) is the only public
@@ -133,8 +135,8 @@ and delivers it to Zoho with the app password, which only it receives
   `path_prefix`) fails `proxy/test_routes.py` until `proxy/Caddyfile` routes it.
 - Compose interpolation (`${VAR}`) prefers the shell's variables over
   `--env-file`; secrets that a shell may also define go through `env_file`.
-- `backup.sh` stops the services with file-based state (Garage, sync, kms,
-  dynamodb, sqs) for the length of the archive copy. A new volume with such
+- `backup.sh` stops the services with file-based state (Garage, sync, AI
+  editing, kms, dynamodb, sqs) for the length of the archive copy. A new volume with such
   state belongs in both scripts' `file_volumes`.
 - `docker compose exec` in a `while read` loop reads the loop's stdin; give it
   `< /dev/null`. `pgrep -f`/`pkill -f` match the shell running them when its

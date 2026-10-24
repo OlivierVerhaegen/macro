@@ -16,7 +16,8 @@ file in [`infra/selfhost/AGENTS.md`](../../infra/selfhost/AGENTS.md).
 - A Zoho app password for SMTP (Zoho Mail → Settings → Security → App
   passwords). Enter it only on the server, in `selfhost.conf`.
 - Access to the images: make the GHCR packages `macro-rust`, `macro-web`,
-  `macro-sync`, `macro-lexical`, `macro-websocket` and `macro-convert` public (GitHub → Packages
+  `macro-sync`, `macro-lexical`, `macro-websocket`, `macro-convert`,
+  `macro-ai-editing` and `macro-analytics` public (GitHub → Packages
   → Package settings), or log in on the server with `docker login ghcr.io` and
   a token with `read:packages`.
 
@@ -125,7 +126,10 @@ for `provision.sh`.
 ## Current limits
 
 - amd64 only; a Raspberry Pi needs arm64 images.
-- Not included yet: the AI editing worker and the analytics proxy.
+- The AI editing worker needs `anthropic_api_key`, `cerebras_api_key` and
+  `openai_api_key` in `selfhost.conf [env]`; without them it keeps restarting
+  and agent editing fails. The analytics proxy sends nothing anywhere: the
+  bundle has no PostHog key, and the OTLP targets have no collector.
 - Two Lambda handlers do not run because nothing on one server triggers them:
   data loss prevention (reads Macro's S3 access logs) and email suppression
   (SES bounces). Notification retention runs in dry-run mode, as in

@@ -71,13 +71,15 @@
 	handle_path /lexical/* {
 		reverse_proxy lexical-service:8096
 	}
-	# Not deployed in phase 0: the analytics proxy (the bundle sends nothing
-	# without its keys) and the AI editing worker.
+	# The analytics proxy routes on its own /i/ prefix. Without Cloudflare in
+	# front, CF-Connecting-IP carries the client for its rate limiter.
 	handle /i/* {
-		respond 204
+		reverse_proxy analytics-proxy:8098 {
+			header_up CF-Connecting-IP {http.request.remote.host}
+		}
 	}
-	handle /ai-editing/* {
-		respond 503
+	handle_path /ai-editing/* {
+		reverse_proxy ai-editing-worker:8933
 	}
 
 	# Storage: presigned URLs point at /local-storage; static files are the

@@ -19,8 +19,8 @@ project="${COMPOSE_PROJECT_NAME:-macro-selfhost}"
 keep="${KEEP:-14}"
 compose=(docker compose -p "$project" -f "$here/compose.yml" --env-file "$config_dir/selfhost.env")
 # Volumes whose services write files: archived while these services are stopped.
-file_volumes=(garage-meta garage-data sync_state kms dynamodb sqs)
-file_services=(garage sync_service kms dynamodb sqs)
+file_volumes=(garage-meta garage-data sync_state ai_editing_state kms dynamodb sqs)
+file_services=(garage sync_service ai_editing_worker kms dynamodb sqs)
 # The image is already on the server for the clock and relays.
 tool_image=python:3.13-alpine3.22
 

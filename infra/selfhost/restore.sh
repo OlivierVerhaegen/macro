@@ -10,7 +10,7 @@ src="${1:?usage: restore.sh <backup-dir> [--config]}"
 here="$(cd "$(dirname "$0")" && pwd)"
 config_dir="${MACRO_SELFHOST_DIR:-/etc/macro}"
 project="${COMPOSE_PROJECT_NAME:-macro-selfhost}"
-file_volumes=(garage-meta garage-data sync_state kms dynamodb sqs)
+file_volumes=(garage-meta garage-data sync_state ai_editing_state kms dynamodb sqs)
 tool_image=python:3.13-alpine3.22
 log() { echo "restore: $*"; }
 
