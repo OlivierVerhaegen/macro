@@ -27,7 +27,7 @@ jobs:
         clean: 'false'
         persist-credentials: 'false'
     - name: Restore cargo cache
-      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+      uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684
       with:
         path: |-
           ~/.cargo/registry/index
@@ -42,6 +42,18 @@ jobs:
           selfhost-rust-
     - name: Build binaries
       run: infra/selfhost/images/ci-build-rust.sh target/selfhost-image
+    - name: Save cargo cache
+      if: always()
+      uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684
+      with:
+        path: |-
+          ~/.cargo/registry/index
+          ~/.cargo/registry/cache
+          ~/.cargo/git/db
+          target/release/deps
+          target/release/build
+          target/release/.fingerprint
+        key: selfhost-rust-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-${{ github.sha }}
     - name: Build and push image
       run: infra/selfhost/images/publish.sh macro-rust infra/selfhost/images/rust.Dockerfile target/selfhost-image --check-libs
       env:

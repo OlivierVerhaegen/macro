@@ -58,11 +58,14 @@ fn rust_job() -> Job {
     base_job("Rust services", 300)
         .add_step(free_disk_space())
         .add_step(steps::checkout(false, false))
-        .add_step(cargo_cache())
+        .add_step(cargo_cache("restore"))
         .add_step(
             Step::new("Build binaries")
                 .run("infra/selfhost/images/ci-build-rust.sh target/selfhost-image"),
         )
+        // Saved even when a later step fails or the run is cancelled, so a long
+        // build is never redone from scratch.
+        .add_step(cargo_cache("save").if_condition(Expression::new("always()")))
         .add_step(publish(
             "macro-rust",
             "infra/selfhost/images/rust.Dockerfile target/selfhost-image --check-libs",
@@ -76,21 +79,29 @@ fn free_disk_space() -> Step<Run> {
 }
 
 /// Dependencies only: workspace crates rebuild on every commit anyway.
-fn cargo_cache() -> Step<Use> {
-    Step::new("Restore cargo cache")
-        .uses("actions", "cache", "5a3ec84eff668545956fd18022155c47e93e2684") // v4.2.3
+/// `action` is `restore` or `save` (the two halves of `actions/cache`).
+fn cargo_cache(action: &str) -> Step<Use> {
+    let key =
+        "selfhost-rust-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-${{ github.sha }}";
+    let step = Step::new(if action == "save" { "Save cargo cache" } else { "Restore cargo cache" })
+        .uses(
+            "actions",
+            &format!("cache/{action}"),
+            "5a3ec84eff668545956fd18022155c47e93e2684",
+        ) // v4.2.3
         .add_with((
             "path",
             "~/.cargo/registry/index\n~/.cargo/registry/cache\n~/.cargo/git/db\ntarget/release/deps\ntarget/release/build\ntarget/release/.fingerprint",
         ))
-        .add_with((
-            "key",
-            "selfhost-rust-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-${{ github.sha }}",
-        ))
-        .add_with((
+        .add_with(("key", key));
+    if action == "save" {
+        step
+    } else {
+        step.add_with((
             "restore-keys",
             "selfhost-rust-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}-\nselfhost-rust-",
         ))
+    }
 }
 
 /// The local-backend bundle `cargo x stack up` serves: every service call goes
