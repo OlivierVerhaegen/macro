@@ -28,7 +28,24 @@ fn data_center_endpoints_follow_the_zoho_domain() {
 
     assert_eq!(eu.accounts.as_str(), "https://accounts.zoho.eu/");
     assert_eq!(eu.mail_api.as_str(), "https://mail.zoho.eu/");
-    assert_eq!(ZohoDataCenter::Eu.imap_host(), "imap.zoho.eu");
+    assert_eq!(
+        ZohoDataCenter::Eu.mail_servers("tech@olivetrees-agency.be"),
+        ZohoMailServers {
+            imap_host: "imappro.zoho.eu".to_owned(),
+            smtp_host: "smtppro.zoho.eu".to_owned(),
+        }
+    );
+    assert_eq!(
+        ZohoDataCenter::Com.mail_servers("someone@ZohoMail.com"),
+        ZohoMailServers {
+            imap_host: "imap.zoho.com".to_owned(),
+            smtp_host: "smtp.zoho.com".to_owned(),
+        }
+    );
+    assert_eq!(
+        ZohoDataCenter::Eu.mail_servers("someone@zoho.eu").imap_host,
+        "imap.zoho.eu"
+    );
     assert_eq!(canada.accounts.as_str(), "https://accounts.zohocloud.ca/");
     assert_eq!(
         "com.au".parse::<ZohoDataCenter>().ok(),

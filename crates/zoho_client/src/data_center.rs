@@ -65,15 +65,35 @@ impl ZohoDataCenter {
         }
     }
 
-    /// IMAP over implicit TLS, port 993.
-    pub fn imap_host(self) -> String {
-        format!("imap.{}", self.domain())
+    /// The IMAP (implicit TLS, port 993) and SMTP (implicit TLS, port 465)
+    /// servers for a mailbox address. Zoho serves organizations on their own
+    /// domain from `imappro`/`smtppro` and personal `@zoho`/`@zohomail`
+    /// addresses from `imap`/`smtp`; a client on the wrong pair stops working.
+    /// Free organizations on their own domain also use `imap`/`smtp`, which the
+    /// address cannot tell apart; this fork serves paid organizations.
+    pub fn mail_servers(self, mailbox_address: &str) -> ZohoMailServers {
+        let domain = mailbox_address
+            .rsplit_once('@')
+            .map_or("", |(_, domain)| domain)
+            .to_ascii_lowercase();
+        let personal = domain
+            .split_once('.')
+            .is_some_and(|(name, _)| name == "zoho" || name == "zohomail");
+        let suffix = if personal { "" } else { "pro" };
+        ZohoMailServers {
+            imap_host: format!("imap{suffix}.{}", self.domain()),
+            smtp_host: format!("smtp{suffix}.{}", self.domain()),
+        }
     }
+}
 
+/// The IMAP and SMTP hosts of one Zoho mailbox.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ZohoMailServers {
+    /// IMAP over implicit TLS, port 993.
+    pub imap_host: String,
     /// SMTP over implicit TLS, port 465.
-    pub fn smtp_host(self) -> String {
-        format!("smtp.{}", self.domain())
-    }
+    pub smtp_host: String,
 }
 
 /// Origins for one data center's OAuth server and Mail API.

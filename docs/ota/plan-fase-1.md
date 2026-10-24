@@ -186,7 +186,7 @@ ik uit de `LIST`-uitvoer.
 | Ster | `\Flagged` |
 | Verplaatsen, archiveren, prullenbak | `UID MOVE` (of COPY+EXPUNGE) naar de map met de juiste rol |
 | Concept opslaan | Besloten: concepten blijven in Macro en gaan niet naar de map Concept van Zoho |
-| Verzenden | SMTP (`smtp.zoho.eu:465`, app-wachtwoord); daarna wordt de kopie in Verzonden op Message-ID gezocht, en anders zelf met `APPEND` gearchiveerd |
+| Verzenden | SMTP (`smtppro.zoho.eu:465` voor een eigen domein, app-wachtwoord); daarna wordt de kopie in Verzonden op Message-ID gezocht, en anders zelf met `APPEND` gearchiveerd |
 | Labels/tags | Gebouwd: IMAP-keywords (Zoho bewaart eigen keywords). Labelnamen mogen geen spaties of `( ) { % * " \ ]` bevatten. Zoho's eigen webmail-labels zijn iets anders en worden niet gesynchroniseerd. |
 
 Verzenden volgt de bestaande `SubmissionOutcome`-regels: een time-out na het
@@ -289,6 +289,17 @@ draaien voor elke commit.
      De namen zijn gelokaliseerd, dus de rollen komen uit de vlaggen. Er is
      geen archiefmap.
    - Geen OBJECTID: bericht-ID's blijven `map/UIDVALIDITY/UID`.
+   - Volgens de Zoho-docs (IMAP- en SMTP-instellingen) gebruiken betaalde
+     organisaties met een eigen domein `imappro`/`smtppro`, en persoonlijke
+     `@zoho`/`@zohomail`-adressen en gratis organisaties `imap`/`smtp`.
+     Macro kiest `imappro.zoho.eu`/`smtppro.zoho.eu` voor een eigen domein
+     (`ZohoDataCenter::mail_servers`). De test hierboven liep op `imap.zoho.eu`;
+     de juiste servers staan in Zoho onder Instellingen → Mail-accounts →
+     Serverconfiguratie.
+   - Handtekeningen (`GET /api/accounts/signature`, scope
+     `ZohoMail.accounts.READ`) zijn geverifieerd tegen de docs. Afbeeldingen
+     erin verwijzen naar `/zm/ImageSignature?...` achter Zoho-login en kunnen
+     niet mee; de import vraagt dan om ze in Macro toe te voegen.
    - De IMAP- en SMTP-login is het mailboxadres (`mailboxAddress`, bv. `tech@`), niet het primaire adres (`contact@`, een alias). Dat wordt nu bij de grant bewaard.
    - SMTP op `smtp.zoho.eu:465` biedt alleen `AUTH LOGIN PLAIN` (geen
      XOAUTH2), met `SIZE 53477376`.
