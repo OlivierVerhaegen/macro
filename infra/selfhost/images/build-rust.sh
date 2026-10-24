@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build the self-hosted Rust binaries in release mode and stage the image
 # context: <out>/bin/<binary> for each line of rust-binaries.txt, plus pdfium,
-# sqlx-cli and the MacroDB migrations.
+# sqlx-cli, the MacroDB migrations and the Lambda host.
 #
 # Runs inside rust:1.94.0-trixie (the CI job does that), so the binaries link
 # against the same Debian as the runtime image. No local-only features:
@@ -37,3 +37,4 @@ cargo install sqlx-cli --locked --version "$sqlx_version" --no-default-features 
 install -m 755 "$out/sqlx/bin/sqlx" "$out/bin/sqlx"
 rm -rf "$out/sqlx"
 cp -r crates/macro_db_client/migrations "$out/migrations"
+cp infra/selfhost/lambda-host/host.py "$out/lambda-host.py"

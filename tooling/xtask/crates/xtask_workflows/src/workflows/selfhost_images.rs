@@ -127,9 +127,10 @@ fn web_job() -> Job {
         ))
 }
 
-/// The JavaScript services, from the Dockerfiles the local stack uses.
+/// The images with Dockerfiles of their own: the JavaScript services the local
+/// stack builds, and the convert service (LibreOfficeKit).
 fn node_job() -> Job {
-    base_job("${{ matrix.name }}", 90)
+    base_job("${{ matrix.name }}", 180)
         .strategy(Strategy {
             fail_fast: Some(false),
             matrix: Some(serde_json::json!({
@@ -137,6 +138,7 @@ fn node_job() -> Job {
                     { "name": "macro-sync", "dockerfile": "docker/sync-service.Dockerfile" },
                     { "name": "macro-lexical", "dockerfile": "docker/lexical-service.Dockerfile" },
                     { "name": "macro-websocket", "dockerfile": "docker/websocket-service.Dockerfile" },
+                    { "name": "macro-convert", "dockerfile": "docker/Dockerfile.convert_service" },
                 ],
             })),
             max_parallel: None,

@@ -16,8 +16,13 @@ def decode_like_the_finalizer(key: str) -> str:
 
 class EventTest(unittest.TestCase):
     def test_parse_notify(self):
-        self.assertEqual(parse_notify("a=http://q/1, b=http://q/2"), {"a": "http://q/1", "b": "http://q/2"})
-        self.assertEqual(parse_notify(""), {})
+        targets = parse_notify("a=http://q/1, a=http://q/2, calls/calls/*.mp4=http://q/3")
+        self.assertEqual([t.queue for t in targets if t.matches("a", "any/key")], ["http://q/1", "http://q/2"])
+        [calls] = [t for t in targets if t.bucket == "calls"]
+        self.assertTrue(calls.matches("calls", "calls/x/rec.mp4"))
+        self.assertFalse(calls.matches("calls", "calls/x/rec.webm"))
+        self.assertFalse(calls.matches("calls", "other/rec.mp4"))
+        self.assertEqual(parse_notify(""), [])
         with self.assertRaises(ValueError):
             parse_notify("bucket-without-queue")
 
@@ -64,6 +69,7 @@ class FakeS3(BaseHTTPRequestHandler):
         self.reply(200, b"", {"ETag": '"abc"'})
 
     def do_GET(self):
+        FakeS3.last_get = dict(self.headers)
         body = FakeS3.stored.get(self.path, (b"",))[0]
         self.reply(200, body)
 
@@ -85,7 +91,7 @@ class RelayTest(unittest.TestCase):
         self.sent = []
         self.s3 = ThreadingHTTPServer(("127.0.0.1", 0), FakeS3)
         upstream = f"127.0.0.1:{self.s3.server_port}"
-        handler = handler_for(upstream, {"doc-storage": "http://queue"}, send=lambda q, m: self.sent.append((q, m)))
+        handler = handler_for(upstream, parse_notify("doc-storage=http://queue"), send=lambda q, m: self.sent.append((q, m)))
         self.relay = ThreadingHTTPServer(("127.0.0.1", 0), handler)
         for server in (self.s3, self.relay):
             threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -216,7 +222,7 @@ class PublicListenerTest(RelayTest):
         self.s3 = ThreadingHTTPServer(("127.0.0.1", 0), FakeS3)
         access = PresignedAccess("test", "secret", "localstack:4566", {"static-file-storage"})
         handler = handler_for(
-            f"127.0.0.1:{self.s3.server_port}", {"doc-storage": "q"}, send=lambda q, m: self.sent.append(m), access=access
+            f"127.0.0.1:{self.s3.server_port}", parse_notify("doc-storage=q"), send=lambda q, m: self.sent.append(m), access=access
         )
         self.relay = ThreadingHTTPServer(("127.0.0.1", 0), handler)
         for server in (self.s3, self.relay):
@@ -234,3 +240,50 @@ class PublicListenerTest(RelayTest):
         FakeS3.stored["/static-file-storage/a.png"] = (b"png", None)
         self.assertEqual(self.request("GET", "/static-file-storage/a.png")[1], b"png")
         self.assertEqual(self.request("GET", "/doc-storage/a.pdf")[0].status, 403)
+
+    def test_public_reads_reach_the_store_signed_as_the_internal_host(self):
+        FakeS3.stored["/static-file-storage/a.png"] = (b"png", None)
+        self.request("GET", "/static-file-storage/a.png", headers={"Authorization": "forged"})
+        self.assertEqual(FakeS3.last_get["Host"], "localstack:4566")
+        self.assertTrue(FakeS3.last_get["Authorization"].startswith("AWS4-HMAC-SHA256 Credential=test/"))
+        self.assertEqual(FakeS3.last_get["x-amz-content-sha256"], "UNSIGNED-PAYLOAD")
+
+    @unittest.skipUnless(botocore, "botocore is not installed")
+    def test_presigned_requests_reach_the_store_as_the_internal_host(self):
+        s3 = botocore.session.get_session().create_client(
+            "s3",
+            region_name="us-east-1",
+            endpoint_url="http://localstack:4566",
+            aws_access_key_id="test",
+            aws_secret_access_key="secret",
+            config=Config(s3={"addressing_style": "path"}, signature_version="s3v4"),
+        )
+        url = urllib.parse.urlsplit(s3.generate_presigned_url("put_object", Params={"Bucket": "doc-storage", "Key": "k"}))
+        response, _ = self.request("PUT", f"{url.path}?{url.query}", b"pdf")
+        self.assertEqual(response.status, 200)
+        self.assertEqual(FakeS3.stored[f"{url.path}?{url.query}"], (b"pdf", "localstack:4566"))
+        self.assertEqual(len(self.sent), 1)
+
+
+@unittest.skipUnless(botocore, "botocore is not installed")
+class SigningTest(unittest.TestCase):
+    def test_sign_headers_matches_botocore(self):
+        import hashlib
+        from datetime import datetime, timezone
+        from unittest import mock
+
+        import botocore.auth
+        from botocore.awsrequest import AWSRequest
+        from botocore.credentials import Credentials
+        from relay import sign_headers
+
+        now = 1_792_800_000.0
+        request = AWSRequest(method="GET", url="http://localstack:4566/static-file-storage/file/a%20b?x=1")
+        frozen = datetime.fromtimestamp(now, timezone.utc).replace(tzinfo=None)
+        with mock.patch.object(botocore.auth, "get_current_datetime", lambda: frozen):
+            botocore.auth.S3SigV4Auth(Credentials("test", "secret"), "s3", "us-east-1").add_auth(request)
+        # botocore signs the (empty) body's hash over http; the rest is the same algorithm.
+        empty = hashlib.sha256(b"").hexdigest()
+        ours = sign_headers("GET", "/static-file-storage/file/a%20b", "x=1", "localstack:4566", "test", "secret", now, empty)
+        self.assertEqual(ours["x-amz-date"], request.headers["X-Amz-Date"])
+        self.assertEqual(ours["Authorization"], request.headers["Authorization"])

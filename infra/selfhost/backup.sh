@@ -4,7 +4,8 @@
 # every secret of the server, so treat it like the server itself).
 #
 # Contents: pg_dump of MacroDB and FusionAuth (live), archives of the volumes
-# with file-based state (taken with their containers briefly stopped), and the
+# with file-based state (taken with their containers briefly stopped: Garage,
+# the sync worker, KMS, DynamoDB, the queues), and the
 # configuration directory. Not included, because they are rebuilt: the search
 # index, Redis, Kafka and the TLS certificates.
 #
@@ -18,8 +19,8 @@ project="${COMPOSE_PROJECT_NAME:-macro-selfhost}"
 keep="${KEEP:-14}"
 compose=(docker compose -p "$project" -f "$here/compose.yml" --env-file "$config_dir/selfhost.env")
 # Volumes whose services write files: archived while these services are stopped.
-file_volumes=(s3 sync_state kms dynamodb sqs)
-file_services=(s3 sync_service kms dynamodb sqs)
+file_volumes=(garage-meta garage-data sync_state kms dynamodb sqs)
+file_services=(garage sync_service kms dynamodb sqs)
 # The image is already on the server for the clock and relays.
 tool_image=python:3.13-alpine3.22
 

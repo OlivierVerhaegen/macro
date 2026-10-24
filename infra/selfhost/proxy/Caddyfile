@@ -4,7 +4,7 @@
 # that every prefix there is handled or listed as not deployed), except:
 # - no CORS overlay: the app and the services share this origin;
 # - storage goes to the upload relay's public port, which checks presigned
-#   signatures, never straight to s3proxy;
+#   signatures, never straight to the store;
 # - static-file's /internal API, FusionAuth, the emulators and Mailpit are not
 #   reachable from outside.
 {
@@ -91,6 +91,22 @@
 			reverse_proxy @svc static-file-service:8080
 			@internal path /internal/*
 			respond @internal 404
+			# CloudFront's image URL rewrite: `?size=N` asks for a variant.
+			@sized {
+				path /file/*
+				query size=*
+			}
+			rewrite @sized {path}/size={query.size}?
+			# CloudFront's origin group for files: the stored object, or else
+			# the image optimizer, which makes and stores the variant.
+			@file path /file/*
+			reverse_proxy @file upload-relay:8081 {
+				rewrite /static-file-storage{uri}
+				@missing status 403 404
+				handle_response @missing {
+					reverse_proxy image-optimizer:8080
+				}
+			}
 			rewrite * /static-file-storage{uri}
 			reverse_proxy upload-relay:8081
 		}

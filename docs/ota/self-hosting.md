@@ -16,7 +16,7 @@ file in [`infra/selfhost/AGENTS.md`](../../infra/selfhost/AGENTS.md).
 - A Zoho app password for SMTP (Zoho Mail → Settings → Security → App
   passwords). Enter it only on the server, in `selfhost.conf`.
 - Access to the images: make the GHCR packages `macro-rust`, `macro-web`,
-  `macro-sync`, `macro-lexical` and `macro-websocket` public (GitHub → Packages
+  `macro-sync`, `macro-lexical`, `macro-websocket` and `macro-convert` public (GitHub → Packages
   → Package settings), or log in on the server with `docker login ghcr.io` and
   a token with `read:packages`.
 
@@ -49,7 +49,7 @@ export MACRO_VERSION=<commit>
 compose="docker compose -f infra/selfhost/compose.yml --env-file /etc/macro/selfhost.env"
 
 # The infrastructure first, then topics, queues, buckets, tables and keys.
-$compose up -d --wait postgres redis kafka search fusionauth aws-gateway
+$compose up -d --wait postgres redis kafka search fusionauth garage aws-gateway
 infra/selfhost/provision.sh
 
 # Then everything: the migrations run first, the services wait for them.
@@ -79,8 +79,9 @@ first.
 ## Backups
 
 `infra/selfhost/backup.sh <dir>` writes one directory per backup: dumps of
-MacroDB and FusionAuth, archives of the volumes with files (S3 data, the live
-state of shared documents, KMS keys, DynamoDB, queues) and `/etc/macro`. The
+MacroDB and FusionAuth, archives of the volumes with files (Garage's objects
+and metadata, the live state of shared documents, KMS keys, DynamoDB, queues)
+and `/etc/macro`. The
 services owning those volumes stop for a few seconds meanwhile. The script keeps
 the last 14 (`KEEP`).
 
@@ -116,15 +117,19 @@ On a new server: Docker, a checkout of the same commit, then
 Only Caddy (`proxy`) on 80 and 443. Behind it: the app under `/app`, the
 services under their paths, and storage under `/local-storage` and
 `/static-file`, where the upload relay refuses every request without a valid
-presigned signature. FusionAuth, the databases, the AWS replacements and the
-mail relay have no public route. The AWS gateway listens on `127.0.0.1:4566`
+presigned signature (reads of public static files excepted). FusionAuth, the
+databases, the AWS replacements, the Lambda handlers and the mail relay have no
+public route. The AWS gateway listens on `127.0.0.1:4566`
 for `provision.sh`.
 
 ## Current limits
 
 - amd64 only; a Raspberry Pi needs arm64 images.
-- Not included yet: the AI editing worker, the analytics proxy and most
-  scheduled Lambdas (only `email_scheduled_handler` runs).
+- Not included yet: the AI editing worker and the analytics proxy.
+- Two Lambda handlers do not run because nothing on one server triggers them:
+  data loss prevention (reads Macro's S3 access logs) and email suppression
+  (SES bounces). Notification retention runs in dry-run mode, as in
+  production: it only logs what it would delete.
 - `agent_harness_service` gets the host's Docker socket, as locally.
 - Signing in with Google or Microsoft needs a public FusionAuth route; for now
   only signing in with an emailed code works.

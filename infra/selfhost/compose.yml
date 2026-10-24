@@ -37,6 +37,12 @@ x-rust: &rust
     migrate:
       condition: service_completed_successfully
 
+# A Lambda handler: the Rust image, run by the Lambda host from its pdfium-ready
+# working directory.
+x-lambda: &lambda
+  <<: *rust
+  working_dir: /app
+
 services:
   postgres:
     <<: *defaults
@@ -218,21 +224,20 @@ services:
     volumes:
       - kms:/data
 
-  s3:
+  # The S3 store (garage/garage.toml). It checks every signature: the services
+  # sign with LOCAL_AWS_* (macro_aws_config), and the upload relay forwards or
+  # signs public requests. Keys are flat, as on S3. provision.sh sets up the
+  # node and the services' key.
+  garage:
     <<: *defaults
-    image: andrewgaul/s3proxy:s3proxy-2.9.0
+    image: dxflrs/garage:v2.1.0
     environment:
-      # Presigned URLs are rewritten to the public address, which breaks their
-      # signature for s3proxy, so it checks none; upload-relay verifies them
-      # on the public side. Only the relay reaches it.
-      S3PROXY_AUTHORIZATION: none
-      S3PROXY_ENDPOINT: http://0.0.0.0:80
-      S3PROXY_IGNORE_UNKNOWN_HEADERS: "true"
-      S3PROXY_CORS_ALLOW_ALL: "true"
-      JCLOUDS_PROVIDER: filesystem
-      JCLOUDS_FILESYSTEM_BASEDIR: /data
+      GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET:?set in the selfhost env file}
+      GARAGE_ADMIN_TOKEN: ${GARAGE_ADMIN_TOKEN:?set in the selfhost env file}
     volumes:
-      - s3:/data
+      - ./garage/garage.toml:/etc/garage.toml:ro
+      - garage-meta:/var/lib/garage/meta
+      - garage-data:/var/lib/garage/data
 
   # --- Macro services ---------------------------------------------------------
   # MacroDB migrations, as the local stack runs them (sqlx-cli). Every Rust
@@ -350,47 +355,302 @@ services:
         aliases:
           - image-proxy-service
 
-  # Scheduled Lambda handlers: the binary runs unchanged against a clock that
-  # serves the Lambda Runtime API (lambda-clock/clock.py) with an EventBridge
-  # event per interval, like the `rate(1 minute)` rule in AWS.
-  email_scheduled_handler:
-    <<: *rust
-    command: ["/app/out/email_scheduled_handler"]
-    environment:
-      AWS_LAMBDA_RUNTIME_API: email-scheduled-clock:9001
-      AWS_LAMBDA_FUNCTION_NAME: email-scheduled-handler
-      AWS_LAMBDA_FUNCTION_MEMORY_SIZE: "256"
-      AWS_LAMBDA_FUNCTION_VERSION: "1"
+  # --- Lambda handlers -------------------------------------------------------
+  # Each runs its binary unchanged under lambda-host/host.py, which serves it the
+  # Lambda Runtime API and turns its production triggers into invocations
+  # (SOURCES: schedules, SQS queues, the upload relay's S3 events, HTTP). The
+  # service name is the function name: the AWS gateway routes Lambda Invoke
+  # calls to `<name>:9001`. Not here, because nothing on this server can trigger
+  # them: dataloss_prevention_handler (reads Macro's S3 access logs) and
+  # email_suppression_handler (SES bounces for macro.com).
 
-  email-scheduled-clock:
-    <<: *defaults
-    image: python:3.13-alpine3.22
-    command: ["python", "/clock/clock.py"]
+  # rate(1 minute): sends that are due and recovery of stuck ones.
+  email-scheduled-handler:
+    <<: *lambda
+    command: ["python3", "/app/lambda-host/host.py", "--", "/app/out/email_scheduled_handler"]
     environment:
       FUNCTION_NAME: email-scheduled-handler
-      SCHEDULE_SECONDS: "60"
-    volumes:
-      - ./lambda-clock/clock.py:/clock/clock.py:ro
+      TIMEOUT_SECONDS: "120"
+      SOURCES: '[{"type": "schedule", "every": 60}]'
+    networks:
+      backend:
+        aliases:
+          - email-scheduled-handler
 
-  # s3proxy sends no bucket notifications and checks no signatures. The relay
-  # sits in front of it: it sends doc-storage's ObjectCreated events to the
-  # upload finalizer's queue, and on its public port (8081, for the public
-  # Caddy) it lets through only presigned requests signed with the services'
-  # AWS secret, plus reads of the static-file bucket.
+  # rate(4 hours): purges items deleted more than 30 days ago.
+  deleted-item-poller:
+    <<: *lambda
+    command: ["python3", "/app/lambda-host/host.py", "--", "/app/out/deleted_item_poller"]
+    environment:
+      FUNCTION_NAME: deleted-item-poller
+      TIMEOUT_SECONDS: "120"
+      SOURCES: '[{"type": "schedule", "every": 14400}]'
+    networks:
+      backend:
+        aliases:
+          - deleted-item-poller
+
+  # rate(5 minutes), in dry-run mode as in production: it only logs what it
+  # would delete. Set the input to {"dry_run": false} to enforce retention.
+  notification-retention-handler:
+    <<: *lambda
+    command: ["python3", "/app/lambda-host/host.py", "--", "/app/out/notification_retention_handler"]
+    environment:
+      FUNCTION_NAME: notification-retention-handler
+      TIMEOUT_SECONDS: "120"
+      SOURCES: '[{"type": "schedule", "every": 300, "input": {"dry_run": true}}]'
+    networks:
+      backend:
+        aliases:
+          - notification-retention-handler
+
+  # rate(1 day): queues retention jobs per organization policy.
+  organization-retention-trigger:
+    <<: *lambda
+    command: ["python3", "/app/lambda-host/host.py", "--", "/app/out/organization_retention_trigger"]
+    environment:
+      FUNCTION_NAME: organization-retention-trigger
+      TIMEOUT_SECONDS: "60"
+      SOURCES: '[{"type": "schedule", "every": 86400}]'
+    networks:
+      backend:
+        aliases:
+          - organization-retention-trigger
+
+  # Consumes those jobs.
+  organization-retention-handler:
+    <<: *lambda
+    command: ["python3", "/app/lambda-host/host.py", "--", "/app/out/organization_retention_handler"]
+    environment:
+      FUNCTION_NAME: organization-retention-handler
+      TIMEOUT_SECONDS: "60"
+      SOURCES: '[{"type": "sqs", "queue": "http://localstack:4566/000000000000/organization-retention-handler-queue", "batch": 1}]'
+    networks:
+      backend:
+        aliases:
+          - organization-retention-handler
+
+  # rate(8 hours): removes unfinished account links older than a day.
+  user-link-cleanup-handler:
+    <<: *lambda
+    command: ["python3", "/app/lambda-host/host.py", "--", "/app/out/user_link_cleanup_handler"]
+    environment:
+      FUNCTION_NAME: user-link-cleanup-handler
+      TIMEOUT_SECONDS: "120"
+      SOURCES: '[{"type": "schedule", "every": 28800}]'
+    networks:
+      backend:
+        aliases:
+          - user-link-cleanup-handler
+
+  # cron(0 8 * * ? *): removes orphaned email attachment files.
+  email-sfs-delete-handler:
+    <<: *lambda
+    command: ["python3", "/app/lambda-host/host.py", "--", "/app/out/email_sfs_delete_handler"]
+    environment:
+      FUNCTION_NAME: email-sfs-delete-handler
+      TIMEOUT_SECONDS: "120"
+      SOURCES: '[{"type": "schedule", "every": 86400, "offset": 28800}]'
+    networks:
+      backend:
+        aliases:
+          - email-sfs-delete-handler
+
+  # rate(1 hour): renews Gmail push subscriptions and checks inbox health
+  # (production values). Without Gmail inboxes it finds nothing to do.
+  email-refresh-handler:
+    <<: *lambda
+    command: ["python3", "/app/lambda-host/host.py", "--", "/app/out/email_refresh_handler"]
+    environment:
+      FUNCTION_NAME: email-refresh-handler
+      TIMEOUT_SECONDS: "120"
+      SOURCES: '[{"type": "schedule", "every": 3600}]'
+      DELETE_UNUSED_AFTER_DAYS: "7"
+      DELETE_INACTIVE_AFTER_DAYS: "60"
+      INBOX_HEALTH_POLL_INTERVAL_HOURS: "6"
+    networks:
+      backend:
+        aliases:
+          - email-refresh-handler
+
+  # Permanently deletes chats marked deleted.
+  delete-chat-handler:
+    <<: *lambda
+    command: ["python3", "/app/lambda-host/host.py", "--", "/app/out/delete_chat_handler"]
+    environment:
+      FUNCTION_NAME: delete-chat-handler
+      TIMEOUT_SECONDS: "60"
+      SOURCES: '[{"type": "sqs", "queue": "http://localstack:4566/000000000000/delete-chat-handler-queue", "batch": 1}]'
+    networks:
+      backend:
+        aliases:
+          - delete-chat-handler
+
+  # Word uploads (docx-upload bucket) into documents. On a failure it tells a
+  # websocket Lambda that does not exist here; that call fails and is logged.
+  docx-unzip-handler:
+    <<: *lambda
+    command: ["python3", "/app/lambda-host/host.py", "--", "/app/out/docx_unzip_handler"]
+    environment:
+      FUNCTION_NAME: docx-unzip-handler
+      TIMEOUT_SECONDS: "300"
+      SOURCES: '[{"type": "s3", "queue": "http://localstack:4566/000000000000/selfhost-docx-unzip-events"}]'
+      WEB_SOCKET_RESPONSE_LAMBDA: "job-update-handler"
+    networks:
+      backend:
+        aliases:
+          - docx-unzip-handler
+
+  # Text and citations of uploaded documents, for search and AI; the same
+  # EventBridge events as in production, plus its own queue.
+  document-text-extractor:
+    <<: *lambda
+    command: ["python3", "/app/lambda-host/host.py", "--", "/app/out/document_text_extractor"]
+    environment:
+      FUNCTION_NAME: document-text-extractor
+      TIMEOUT_SECONDS: "300"
+      SOURCES: '[{"type": "s3-eventbridge", "queue": "http://localstack:4566/000000000000/selfhost-text-extractor-events"}, {"type": "sqs", "queue": "http://localstack:4566/000000000000/document-text-extractor-lambda-queue", "batch": 1}]'
+    networks:
+      backend:
+        aliases:
+          - document-text-extractor
+
+  # Hands every new document version to search indexing.
+  search-upload-handler:
+    <<: *lambda
+    command: ["python3", "/app/lambda-host/host.py", "--", "/app/out/search_upload_handler"]
+    environment:
+      FUNCTION_NAME: search-upload-handler
+      TIMEOUT_SECONDS: "60"
+      SOURCES: '[{"type": "s3-eventbridge", "queue": "http://localstack:4566/000000000000/selfhost-search-upload-events"}]'
+    networks:
+      backend:
+        aliases:
+          - search-upload-handler
+
+  # Image variants (`/static-file/file/<id>?size=N`, see proxy/Caddyfile). It
+  # resizes in the background by invoking itself through the AWS gateway.
+  image-optimizer:
+    <<: *lambda
+    command: ["python3", "/app/lambda-host/host.py", "--", "/app/out/image_optimizer"]
+    environment:
+      FUNCTION_NAME: image-optimizer
+      TIMEOUT_SECONDS: "30"
+      SOURCES: '[{"type": "http", "port": 8080}]'
+      BUCKET: "static-file-storage"
+    networks:
+      backend:
+        aliases:
+          - image-optimizer
+
+  # Bulk uploads: queues each zip that lands in bulk-upload-staging.
+  upload-extractor-lambda-trigger:
+    <<: *lambda
+    command: ["python3", "/app/lambda-host/host.py", "--", "/app/out/upload_extractor_lambda_trigger"]
+    environment:
+      FUNCTION_NAME: upload-extractor-lambda-trigger
+      TIMEOUT_SECONDS: "60"
+      SOURCES: '[{"type": "s3-eventbridge", "queue": "http://localstack:4566/000000000000/selfhost-upload-extractor-events"}]'
+      DYNAMODB_TABLE: "bulk-upload"
+    networks:
+      backend:
+        aliases:
+          - upload-extractor-lambda-trigger
+
+  # Unpacks those zips into documents.
+  upload-extractor-lambda-handler:
+    <<: *lambda
+    command: ["python3", "/app/lambda-host/host.py", "--", "/app/out/upload_extractor_lambda_handler"]
+    environment:
+      FUNCTION_NAME: upload-extractor-lambda-handler
+      TIMEOUT_SECONDS: "300"
+      SOURCES: '[{"type": "sqs", "queue": "http://localstack:4566/000000000000/bulk-upload-queue", "batch": 1}]'
+      DYNAMODB_TABLE: "bulk-upload"
+      UPLOAD_BUCKET_NAME: "bulk-upload-staging"
+      DSS_URL: "http://document-storage-service:8080"
+      CONNECTION_GATEWAY_URL: "http://connection-gateway:8080"
+    networks:
+      backend:
+        aliases:
+          - upload-extractor-lambda-handler
+
+  # Preview images of call recordings (calls/*.mp4).
+  call-recording-preview-handler:
+    <<: *lambda
+    command: ["python3", "/app/lambda-host/host.py", "--", "/app/out/call_recording_preview_handler"]
+    environment:
+      FUNCTION_NAME: call-recording-preview-handler
+      TIMEOUT_SECONDS: "300"
+      SOURCES: '[{"type": "s3", "queue": "http://localstack:4566/000000000000/selfhost-call-recording-events"}]'
+      FFMPEG_PATH: "/usr/bin/ffmpeg"
+      FFPROBE_PATH: "/usr/bin/ffprobe"
+    networks:
+      backend:
+        aliases:
+          - call-recording-preview-handler
+
+  # Replaces worker_trigger, which starts this as an ECS task every hour.
+  sha-cleanup-worker:
+    <<: *rust
+    command: ["sh", "-c", "while :; do /app/out/sha_cleanup_worker; sleep 3600; done"]
+
+  # EventBridge rules whose target is a queue rather than a Lambda: the same
+  # messages on the same schedules (scheduler/scheduler.py).
+  scheduler:
+    <<: *defaults
+    image: python:3.13-alpine3.22
+    command: ["python", "/scheduler/scheduler.py"]
+    environment:
+      SCHEDULES: '[{"name": "reminder-sweep", "every": 60, "queue": "http://localstack:4566/000000000000/reminder-dispatch-queue", "body": {"operation": "sweep"}}, {"name": "calendar-reminder-sweep", "every": 60, "queue": "http://localstack:4566/000000000000/calendar-reminder-dispatch-queue", "body": {"operation": "sweep"}}, {"name": "crm-cleanup", "every": 86400, "offset": 28800, "queue": "http://localstack:4566/000000000000/email-service-crm-cleanup-queue", "body": {"operation": "start_job"}}]'
+    volumes:
+      - ./scheduler/scheduler.py:/scheduler/scheduler.py:ro
+    depends_on:
+      - aws-gateway
+
+  # Office documents (docx, xlsx, legacy formats) into Macro documents with
+  # LibreOfficeKit, from the convert queue; its own image (docker/Dockerfile.convert_service).
+  convert_service:
+    <<: [*defaults, *env-file]
+    image: ${MACRO_REGISTRY:-ghcr.io/olivierverhaegen}/macro-convert:${MACRO_VERSION:?set to the image commit}
+    environment:
+      LOK_PATH: /app/lok/instdir/program
+      WEB_SOCKET_RESPONSE_LAMBDA: job-update-handler
+    networks:
+      backend:
+        aliases:
+          - convert-service
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # Garage sends no SQS bucket notifications and serves no public reads. The
+  # relay sits in front of it: it sends the buckets' ObjectCreated events, and
+  # on its public port (8081, for the public Caddy) it lets through only valid
+  # presigned requests, plus reads of the static-file bucket, which it signs.
   upload-relay:
     # The AWS key comes from the env file, not interpolation: a shell's own
-    # AWS_* variables would win there.
+    # variables would win there.
     <<: [*defaults, *env-file]
     image: python:3.13-alpine3.22
     command: ["python", "/relay/relay.py"]
     environment:
-      S3_UPSTREAM: s3:80
-      NOTIFY: doc-storage=http://localstack:4566/000000000000/document-upload-finalizer-queue
+      S3_UPSTREAM: garage:3900
+      # The bucket notifications of production: the upload finalizer, text
+      # extraction and search for documents, Word and bulk uploads, call
+      # recordings, and static file metadata.
+      NOTIFY: >-
+        doc-storage=http://localstack:4566/000000000000/document-upload-finalizer-queue,
+        doc-storage=http://localstack:4566/000000000000/selfhost-text-extractor-events,
+        doc-storage=http://localstack:4566/000000000000/selfhost-search-upload-events,
+        docx-upload=http://localstack:4566/000000000000/selfhost-docx-unzip-events,
+        bulk-upload-staging=http://localstack:4566/000000000000/selfhost-upload-extractor-events,
+        macro-call-recording-local/calls/*.mp4=http://localstack:4566/000000000000/selfhost-call-recording-events,
+        static-file-storage=http://localstack:4566/000000000000/static-file-s3-event-notification-queue
       PUBLIC_READ: static-file-storage
     volumes:
       - ./upload-relay/relay.py:/relay/relay.py:ro
     depends_on:
-      - s3
+      - garage
 
   sync_service:
     <<: [*defaults, *env-file]
@@ -470,7 +730,8 @@ volumes:
   sqs:
   dynamodb:
   kms:
-  s3:
+  garage-meta:
+  garage-data:
   sync_state:
   caddy_data:
   caddy_config:

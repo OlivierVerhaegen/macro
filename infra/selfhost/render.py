@@ -66,9 +66,18 @@ ROTATED_KEYS = [
 # FusionAuth API keys must look like its own (a UUID); the rest are opaque.
 UUID_SHAPED = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 API_TOKEN_KEYS = ("MACRO_API_TOKEN_PRIVATE_SECRET_KEY", "MACRO_API_TOKEN_PUBLIC_KEY")
-# Generated once and kept. The AWS secret signs presigned storage URLs, which
-# the upload relay verifies on the public side; the emulators ignore it.
-INFRA_PASSWORDS = ("POSTGRES_PASSWORD", "FUSIONAUTH_DB_PASSWORD", "AWS_SECRET_ACCESS_KEY")
+# Generated once per server and kept. Garage's own RPC secret and admin token,
+# and the services' storage key in Garage's format (`GK` + 24 hex digits, a
+# 64-digit secret): the services sign with it (LOCAL_AWS_*, macro_aws_config),
+# Garage checks it, and the upload relay checks presigned URLs with it.
+INFRA_SECRETS = {
+    "POSTGRES_PASSWORD": lambda: secrets.token_urlsafe(32),
+    "FUSIONAUTH_DB_PASSWORD": lambda: secrets.token_urlsafe(32),
+    "GARAGE_RPC_SECRET": lambda: secrets.token_hex(32),
+    "GARAGE_ADMIN_TOKEN": lambda: secrets.token_urlsafe(32),
+    "LOCAL_AWS_ACCESS_KEY_ID": lambda: "GK" + secrets.token_hex(12),
+    "LOCAL_AWS_SECRET_ACCESS_KEY": lambda: secrets.token_hex(32),
+}
 # The FusionAuth image runs as this user and reads the kickstart.
 FUSIONAUTH_UID = 1001
 
@@ -160,8 +169,8 @@ def rotate(env: dict[str, str], state: dict) -> dict[str, str]:
         state["api_token"] = {"private": private, "public": public}
     env[API_TOKEN_KEYS[0]] = state["api_token"]["private"]
     env[API_TOKEN_KEYS[1]] = state["api_token"]["public"]
-    for key in INFRA_PASSWORDS:
-        state["infra"].setdefault(key, secrets.token_urlsafe(32))
+    for key, generate in INFRA_SECRETS.items():
+        state["infra"].setdefault(key, generate())
     return mapping
 
 
@@ -195,7 +204,10 @@ def publish(env: dict[str, str], conf: configparser.ConfigParser, state: dict) -
             "DEVELOPMENT_SIGNUP_ALLOWLIST_JSON": json.dumps(signup_allowlist(conf)),
             "SMTP_HOST": "mailrelay",
             "SMTP_PORT": "25",
-            **{key: state["infra"][key] for key in INFRA_PASSWORDS},
+            **{key: state["infra"][key] for key in INFRA_SECRETS},
+            # Clients that read the default credential chain sign the same way.
+            "AWS_ACCESS_KEY_ID": state["infra"]["LOCAL_AWS_ACCESS_KEY_ID"],
+            "AWS_SECRET_ACCESS_KEY": state["infra"]["LOCAL_AWS_SECRET_ACCESS_KEY"],
         }
     )
     env["PIPEDREAM_WEBHOOK_URI"] = re.sub(

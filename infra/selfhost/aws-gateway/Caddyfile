@@ -22,7 +22,15 @@
 		reverse_proxy {$KMS_UPSTREAM:kms:8080}
 	}
 
-	# s3proxy has no bucket notifications. Accept the configuration the
+	# Lambda Invoke: each handler's host serves it on `<function name>:9001`.
+	# A function that does not run here fails to resolve (502), and the caller
+	# logs it.
+	@lambda_invoke path_regexp invoke ^/2015-03-31/functions/([a-z0-9-]+)/invocations$
+	handle @lambda_invoke {
+		reverse_proxy {re.invoke.1}:{$LAMBDA_PORT:9001}
+	}
+
+	# Garage has no bucket notifications. Accept the configuration the
 	# provisioning step writes; upload events reach SQS through the relay.
 	@notification {
 		method PUT GET
@@ -32,9 +40,8 @@
 		respond `<?xml version="1.0" encoding="UTF-8"?><NotificationConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/"/>` 200
 	}
 
-	# Per-bucket CORS is unsupported too, and unneeded: the browser reaches
-	# storage through the app's own origin (/local-storage), and s3proxy
-	# allows CORS globally.
+	# Per-bucket CORS is unneeded: the browser reaches storage through the app's
+	# own origin (/local-storage). Accept the provisioning step's configuration.
 	@cors {
 		method PUT
 		expression {query} == "cors"
