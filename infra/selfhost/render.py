@@ -243,6 +243,34 @@ def signup_allowlist(conf: configparser.ConfigParser) -> list[str]:
     return emails
 
 
+QUEUE_NAME = re.compile(r"[a-z0-9][a-z0-9-]*")
+TYPED_QUEUES = REPO / "crates/macro_queues/src/lib.rs"
+TYPED_QUEUE = re.compile(r'pub (\w+) \{\s*local: "([^"]+)"')
+
+
+def typed_queues(source: str) -> dict[str, str]:
+    """`OVERRIDE_<NAME>` -> local queue name for each queue in macro_queues."""
+    snake = lambda name: re.sub(r"(?<!^)(?=[A-Z])", "_", name).upper()
+    return {f"OVERRIDE_{snake(name)}": local for name, local in TYPED_QUEUE.findall(source)}
+
+
+def queue_urls(env: dict[str, str], typed: dict[str, str]) -> None:
+    """Every queue setting becomes a queue URL.
+
+    Services name their queues, either through the generated env
+    (`CONTACTS_QUEUE=contacts-queue`) or through macro_queues' defaults
+    unless `OVERRIDE_<NAME>` is set. SQS and LocalStack accept a bare name as
+    the QueueUrl; ElasticMQ answers InvalidAction, so here every queue gets its
+    URL.
+    """
+    base = f"{env['LOCAL_AWS_URL'].rstrip('/')}/000000000000"
+    for key, value in env.items():
+        if "QUEUE" in key and QUEUE_NAME.fullmatch(value) and value not in ("true", "false"):
+            env[key] = f"{base}/{value}"
+    for key, name in typed.items():
+        env.setdefault(key, f"{base}/{name}")
+
+
 def add_gmail_placeholder(doc: dict) -> None:
     """A disabled `google_gmail` identity provider when the kickstart has none.
 
@@ -334,6 +362,10 @@ def main() -> None:
     state = load_state(state_path)
     mapping = rotate(env, state)
     publish(env, conf, state)
+    typed = typed_queues(TYPED_QUEUES.read_text())
+    if len(typed) < 20:
+        fail(f"found only {len(typed)} queues in {TYPED_QUEUES}; review TYPED_QUEUE")
+    queue_urls(env, typed)
     kickstart = render_kickstart(kickstart_path, mapping, env, conf)
 
     # Compose interpolates `$` in env files, which would silently change a value.

@@ -22,5 +22,27 @@ class GmailPlaceholderTest(unittest.TestCase):
         self.assertEqual(len(doc["requests"]), 1)
 
 
+class QueueUrlTest(unittest.TestCase):
+    def test_names_become_urls_and_the_rest_stays(self):
+        env = {
+            "LOCAL_AWS_URL": "http://localstack:4566",
+            "CONTACTS_QUEUE": "contacts-queue",
+            "NOTIFICATION_QUEUE": "http://localstack:4566/000000000000/notification-queue",
+            "ENABLE_GMAIL_OPS_QUEUE": "true",
+            "CONTACTS_BUCKET": "contacts",
+        }
+        render.queue_urls(env, {"OVERRIDE_CONTACTS_QUEUE": "contacts-queue"})
+        self.assertEqual(env["CONTACTS_QUEUE"], "http://localstack:4566/000000000000/contacts-queue")
+        self.assertEqual(env["NOTIFICATION_QUEUE"], "http://localstack:4566/000000000000/notification-queue")
+        self.assertEqual(env["ENABLE_GMAIL_OPS_QUEUE"], "true")
+        self.assertEqual(env["CONTACTS_BUCKET"], "contacts")
+        self.assertEqual(env["OVERRIDE_CONTACTS_QUEUE"], "http://localstack:4566/000000000000/contacts-queue")
+
+    def test_typed_queues_come_from_macro_queues(self):
+        typed = render.typed_queues(render.TYPED_QUEUES.read_text())
+        self.assertEqual(typed["OVERRIDE_CONTACTS_QUEUE"], "contacts-queue")
+        self.assertEqual(typed["OVERRIDE_WEBHOOK_EVENT_QUEUE"], "webhook-event-queue.fifo")
+
+
 if __name__ == "__main__":
     unittest.main()
