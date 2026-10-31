@@ -91,7 +91,8 @@ and delivers it to Zoho with the app password, which only it receives
 - After changing the public routes:
   `MACRO_DOMAIN=example.test ACME_EMAIL=a@example.test caddy validate --config infra/selfhost/proxy/Caddyfile --adapter caddyfile`
 - Python: `python3 -m unittest` in `lambda-host/`, `scheduler/`,
-  `upload-relay/` (uses botocore when installed), `mailrelay/` and `proxy/`.
+  `upload-relay/` (uses botocore when installed), `mailrelay/` and `proxy/`,
+  and `python3 -m unittest test_render` here.
 - After changing the workflow module: `cargo x workflows` and
   `cargo test -p xtask_workflows`.
 
@@ -130,6 +131,18 @@ and delivers it to Zoho with the app password, which only it receives
 - A handler that invokes a Lambda that does not run here (the websocket
   response Lambda of docx and convert failures) gets a 502 from the gateway and
   logs it.
+- ElasticMQ only takes queue URLs, where SQS and LocalStack also accept a
+  bare name. `render.py` turns every queue setting into a URL, including each
+  `macro_queues` `OVERRIDE_<NAME>`, parsed from that crate's source; a queue
+  defined another way gets no URL and its worker loops on InvalidAction.
+- The shared env sets `PORT=8080` for every service, so the Lambda host reads
+  `LAMBDA_API_PORT` (default 9001) for the Invoke API.
+- `agent_harness_service` exits at startup without Pipedream settings or a
+  `google_gmail` identity provider: the compose file defaults the first to
+  "not-configured", and `render.py` adds a disabled provider to the kickstart.
+- OpenSearch runs without its security plugin and with
+  `DISABLE_INSTALL_DEMO_CONFIG`; the demo setup rejects short admin passwords
+  and stops the container.
 - The images are amd64 only.
 - A new public path in the local proxy (`proxy.rs` or an inventory
   `path_prefix`) fails `proxy/test_routes.py` until `proxy/Caddyfile` routes it.
