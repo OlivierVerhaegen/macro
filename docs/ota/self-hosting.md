@@ -6,8 +6,12 @@ file in [`infra/selfhost/AGENTS.md`](../../infra/selfhost/AGENTS.md).
 
 ## What you need
 
-- An amd64 server (OVH VPS) with at least 24 GB of RAM and 100 GB of disk,
-  Debian or Ubuntu, with Docker Engine and the compose plugin.
+- An amd64 server (OVH VPS) with at least 8 GB of RAM and 60 GB of disk,
+  Debian or Ubuntu, with Docker Engine and the compose plugin. Measured with
+  the whole stack idle: about 4.3 GB in the containers and 5.4 GB used on the
+  machine, of which OpenSearch, FusionAuth and Kafka take 2 GB; the images
+  take about 24 GB on disk, the data starts in megabytes. 16 GB leaves room
+  for real use and for several people.
 - A DNS record `macro.olivetrees-agency.be` pointing at the server's IP; ports
   80 and 443 open, everything else closed.
 - On the server: `git`, `python3`, `openssl`, `ssh-keygen` and a Rust toolchain
@@ -75,7 +79,8 @@ MACRO_VERSION=<new commit> docker compose -f infra/selfhost/compose.yml \
 ```
 
 `up -d` runs `migrate` again; the services restart only after it. Make a backup
-first.
+first. Each upgrade pulls new images next to the old ones; free their space
+afterwards with `docker image prune -a`.
 
 ## Backups
 

@@ -39,7 +39,7 @@ Candidates: an OVH VPS or our own Raspberry Pi.
 | | OVH VPS | Raspberry Pi 5 |
 | --- | --- | --- |
 | Architecture | x86_64 | arm64; the stack already builds for `aarch64-unknown-linux-gnu`, and Postgres, OpenSearch, Redpanda and FusionAuth have arm64 images. To verify: every other image and the sync worker. |
-| Memory | Choose ≥ 24 GB | At most 16 GB. Three JVMs (OpenSearch, FusionAuth, Kafka) plus ~30 Rust services is tight; probably only feasible with Redpanda instead of Kafka and a small OpenSearch heap. |
+| Memory | ≥ 8 GB (measured: 5.4 GB used with the stack idle; see `self-hosting.md`) | At most 16 GB. Three JVMs (OpenSearch, FusionAuth, Kafka) plus ~30 Rust services is tight; probably only feasible with Redpanda instead of Kafka and a small OpenSearch heap. |
 | Storage | SSD/NVMe | An NVMe or USB SSD is required; an SD card does not survive the write load of Postgres and Kafka. |
 | Reachability | Fixed IP, ports 80/443 | Home IP: through Cloudflare Tunnel (`xtask_local` already supports tunnels, `cf_tunnel.rs`), without opening ports. |
 | Building | In CI | Not on the Pi itself (Rust builds take hours): cross-compile to arm64 elsewhere. |
