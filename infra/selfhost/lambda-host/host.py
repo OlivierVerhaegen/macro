@@ -26,8 +26,8 @@ handler can invoke itself or another handler asynchronously or synchronously.
 One invocation runs at a time, in arrival order.
 
 Environment: FUNCTION_NAME, SOURCES (a JSON list of the sources above),
-TIMEOUT_SECONDS (the handler's deadline, default 300), PORT (default 9001),
-AWS_URL (the SQS endpoint, default http://localstack:4566).
+TIMEOUT_SECONDS (the handler's deadline, default 300), LAMBDA_API_PORT
+(default 9001; not PORT, which the shared service env sets to 8080), AWS_URL (the SQS endpoint, default http://localstack:4566).
 Usage: host.py -- <handler binary> [args...]
 """
 
@@ -486,7 +486,7 @@ def main() -> None:
     sources = json.loads(os.environ.get("SOURCES", "[]"))
     runtime = Runtime(function, float(os.environ.get("TIMEOUT_SECONDS", "300")))
     sqs = Sqs(os.environ.get("AWS_URL", "http://localstack:4566"))
-    port = int(os.environ.get("PORT", "9001"))
+    port = int(os.environ.get("LAMBDA_API_PORT", "9001"))
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: (stop.set(), sys.exit(0)))
 

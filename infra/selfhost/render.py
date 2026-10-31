@@ -80,6 +80,8 @@ INFRA_SECRETS = {
 }
 # The FusionAuth image runs as this user and reads the kickstart.
 FUSIONAUTH_UID = 1001
+# xtask_local's identity::GOOGLE_GMAIL_IDP_ID, so a later real provider keeps the id.
+GOOGLE_GMAIL_IDP_ID = "55555555-5555-4555-8555-555555555555"
 
 
 def fail(message: str) -> None:
@@ -241,6 +243,38 @@ def signup_allowlist(conf: configparser.ConfigParser) -> list[str]:
     return emails
 
 
+def add_gmail_placeholder(doc: dict) -> None:
+    """A disabled `google_gmail` identity provider when the kickstart has none.
+
+    The kickstart creates Google's providers only for a configured Google
+    client, but agent_harness_service looks `google_gmail` up at startup (its
+    public MCP server signs in through it) and exits without it. A disabled
+    provider lets it start; Google sign-in stays unavailable.
+    """
+    names = {r.get("body", {}).get("identityProvider", {}).get("name") for r in doc["requests"]}
+    if "google_gmail" in names:
+        return
+    doc["requests"].append({
+        "method": "POST",
+        "url": f"/api/identity-provider/{GOOGLE_GMAIL_IDP_ID}",
+        "body": {"identityProvider": {
+            "type": "OpenIDConnect",
+            "name": "google_gmail",
+            "enabled": False,
+            "buttonText": "Google",
+            "oauth2": {
+                "authorization_endpoint": "https://accounts.google.com/o/oauth2/v2/auth",
+                "token_endpoint": "https://oauth2.googleapis.com/token",
+                "userinfo_endpoint": "https://openidconnect.googleapis.com/v1/userinfo",
+                "client_id": "not-configured",
+                # No secret to give; a confidential method would demand one.
+                "clientAuthenticationMethod": "none",
+                "scope": "openid profile email",
+            },
+        }},
+    })
+
+
 def render_kickstart(path: Path, mapping: dict[str, str], env: dict[str, str], conf) -> str:
     doc = json.loads(path.read_text())
     public = f"https://{conf['server']['domain']}"
@@ -275,6 +309,7 @@ def render_kickstart(path: Path, mapping: dict[str, str], env: dict[str, str], c
         oauth = request.get("body", {}).get("application", {}).get("oauthConfiguration")
         if oauth:
             oauth["authorizedRedirectURLs"] = list(dict.fromkeys(oauth["authorizedRedirectURLs"]))
+    add_gmail_placeholder(doc)
     leftover = [s for s in mapping if len(s) >= 8 and s in json.dumps(doc)]
     if leftover:
         fail("the kickstart still contains a local secret; review render_kickstart")

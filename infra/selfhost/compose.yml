@@ -117,7 +117,9 @@ services:
       plugins.security.disabled: "true"
       bootstrap.memory_lock: "true"
       OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
-      OPENSEARCH_INITIAL_ADMIN_PASSWORD: ${OPENSEARCH_PASSWORD:?set in the selfhost env file}
+      # Without security there is no admin user; the demo configuration would
+      # demand a strong initial password and stop the container otherwise.
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
     ulimits:
       memlock:
         soft: -1
@@ -322,6 +324,12 @@ services:
     <<: *rust
     command: ["/app/out/agent_harness_service"]
     environment:
+      # Pipedream (third-party app connections) is required at startup but
+      # used only when someone connects an app; set pipedream_client_id,
+      # pipedream_client_secret and pipedream_project_id in selfhost.conf [env].
+      PIPEDREAM_CLIENT_ID: ${PIPEDREAM_CLIENT_ID:-not-configured}
+      PIPEDREAM_CLIENT_SECRET: ${PIPEDREAM_CLIENT_SECRET:-not-configured}
+      PIPEDREAM_PROJECT_ID: ${PIPEDREAM_PROJECT_ID:-not-configured}
       OVERRIDE_CONNECTION_GATEWAY_URL: http://connection-gateway:8080
       OVERRIDE_LEXICAL_SERVICE_URL: http://lexical-service:8096
       OVERRIDE_SYNC_SERVICE_URL: http://sync-service:8787
