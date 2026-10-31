@@ -61,3 +61,6 @@ infra/local/generated/
 gha-creds-*.json
 # Python bytecode (infra/selfhost scripts and tests).
 __pycache__/
+
+# infra/selfhost run locally from the devcontainer (docs/ota/local-dev.md)
+/.selfhost/

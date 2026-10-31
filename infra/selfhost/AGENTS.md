@@ -71,6 +71,8 @@ and delivers it to Zoho with the app password, which only it receives
 ## Recipes
 
 - Install, upgrade, back up and restore: `docs/ota/self-hosting.md`.
+- Run it on a laptop, from the devcontainer: `docs/ota/local-dev.md`
+  (`domain = macro.localhost`, config in the git-ignored `.selfhost/`).
 - Garage's layout and key, Kafka topics, queues, buckets, tables and KMS keys:
   `provision.sh` (idempotent).
 - A new Rust service: add its binary to `images/rust-binaries.txt` and a

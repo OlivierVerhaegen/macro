@@ -2,7 +2,8 @@
 
 A guide for the Olive Trees fork: Macro on one VPS, without AWS. The design and
 its choices are in [plan-phase-0.md](plan-phase-0.md); the technical details per
-file in [`infra/selfhost/AGENTS.md`](../../infra/selfhost/AGENTS.md).
+file in [`infra/selfhost/AGENTS.md`](../../infra/selfhost/AGENTS.md). To run the
+same stack on a laptop first, see [local-dev.md](local-dev.md).
 
 ## What you need
 

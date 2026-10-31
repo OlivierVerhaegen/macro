@@ -1,0 +1,27 @@
+// Olive Trees fork: everything runs inside this container, including its own
+// Docker daemon, so the laptop needs only a Docker runtime and an editor.
+// Usage: docs/ota/local-dev.md.
+{
+  "name": "Macro",
+  "build": { "dockerfile": "Dockerfile" },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/nix:1": {
+      "extraNixConfig": "experimental-features = nix-command flakes"
+    }
+  },
+  // Root: infra/selfhost/render.py hands FusionAuth's kickstart to uid 1001,
+  // and one user keeps target/ and node_modules/ writable for every command.
+  "remoteUser": "root",
+  "mounts": [
+    // The Nix store survives a rebuild of the container.
+    "source=macro-devcontainer-nix,target=/nix,type=volume"
+  ],
+  // The self-hosted stack's public proxy, on the laptop's loopback only.
+  "runArgs": ["-p", "127.0.0.1:80:80", "-p", "127.0.0.1:443:443"],
+  // The local stack: its HTTPS proxy, Mailpit and the frontend.
+  "forwardPorts": [8090, 8025, 3000],
+  "hostRequirements": { "cpus": 4, "memory": "12gb" },
+  // Downloads the toolchain once, so the first `nix develop` is quick.
+  "postCreateCommand": "nix develop --command just --version"
+}
